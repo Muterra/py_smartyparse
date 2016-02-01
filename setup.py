@@ -14,8 +14,8 @@ from os import path
 here = path.abspath(path.dirname(__file__))
 
 # Get the long description from the README file
-with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
-    long_description = f.read()
+import pypandoc
+long_description = pypandoc.convert('README.md', 'rst')
 
 setup(
     name='smartyparse',
