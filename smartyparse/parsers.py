@@ -42,7 +42,7 @@ import collections
 
 
 class ParserBase(metaclass=abc.ABCMeta):
-    LENGTH = None
+    length = None
     
     @staticmethod
     @abc.abstractmethod
@@ -64,11 +64,6 @@ class ParserBase(metaclass=abc.ABCMeta):
             return obj()
         else:
             return obj
-            
-    @property
-    @classmethod
-    def length(cls):
-        return cls.LENGTH
         
 
 class _ParseNeat(ParserBase):
@@ -91,7 +86,7 @@ class _ParseINT8US(ParserBase):
     ''' Parse an 8-bit unsigned integer.
     '''
     PACKER = struct.Struct('>B')
-    LENGTH = PACKER.size
+    length = PACKER.size
     
     @classmethod
     def unpack(cls, data):
@@ -107,7 +102,7 @@ class _ParseINT16US(ParserBase):
     ''' Parse a 16-bit unsigned integer.
     '''
     PACKER = struct.Struct('>H')
-    LENGTH = PACKER.size
+    length = PACKER.size
     
     @classmethod
     def unpack(cls, data):
@@ -123,7 +118,7 @@ class _ParseINT32US(ParserBase):
     ''' Parse a 32-bit unsigned integer.
     '''
     PACKER = struct.Struct('>I')
-    LENGTH = PACKER.size
+    length = PACKER.size
     
     @classmethod
     def unpack(cls, data):
@@ -139,7 +134,7 @@ class _ParseINT64US(ParserBase):
     ''' Parse a 64-bit unsigned integer.
     '''
     PACKER = struct.Struct('>Q')
-    LENGTH = PACKER.size
+    length = PACKER.size
     
     @classmethod
     def unpack(cls, data):
@@ -154,7 +149,7 @@ class _ParseINT64US(ParserBase):
 class _ParseNone(ParserBase):
     ''' Parses nothing. unpack returns None, pack returns b''
     '''
-    LENGTH = 0
+    length = 0
     
     @classmethod
     def unpack(cls, data):

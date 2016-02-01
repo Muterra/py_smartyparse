@@ -645,22 +645,7 @@ class SmartyParser():
                     
                 # Check to see if this is a delayed execution thingajobber
                 if fieldname in self._defer_eval[0]:
-                    # Figure out what parser we wait for
-                    waitfor = self._defer_eval[0][fieldname]
-                    # Save state with that parser's _defer_eval
-                    
-                    def deferred_call(fieldname=fieldname, loc=parser._slice):
-                        # First do the delayed data evaluation
-                        self._control[fieldname].pack_into(
-                            obj=obj[fieldname], 
-                            into=pack_into, 
-                            override_slice=loc)
-                        # Now call anything that was waiting on us.
-                        for deferred in self._defer_eval[1][fieldname]:
-                            deferred()
-                    
-                    # Add that function into the appropriate register
-                    self._defer_eval[1][waitfor].append(deferred_call)
+                    self._generate_deferred(fieldname, parser, obj, pack_into)
                     # And don't forget to override parsing and lookup.
                     # If the object is too small for the next field, pad it out
                     if len(pack_into) < parser._slice.stop:
@@ -708,6 +693,24 @@ class SmartyParser():
                 parser.offset = oldoffset
             
         return pack_into
+        
+    def _generate_deferred(self, fieldname, parser, obj, pack_into):
+        # Figure out what parser we wait for
+        waitfor = self._defer_eval[0][fieldname]
+        # Save state with that parser's _defer_eval
+        
+        def deferred_call(fieldname=fieldname, loc=parser._slice):
+            # First do the delayed data evaluation
+            self._control[fieldname].pack_into(
+                obj=obj[fieldname], 
+                into=pack_into, 
+                override_slice=loc)
+            # Now call anything that was waiting on us.
+            for deferred in self._defer_eval[1][fieldname]:
+                deferred()
+        
+        # Add that function into the appropriate register
+        self._defer_eval[1][waitfor].append(deferred_call)
         
     def unpack(self, message):
         ''' Automatically unpacks an object from message.
