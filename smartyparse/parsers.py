@@ -46,15 +46,15 @@ class ParserBase(metaclass=abc.ABCMeta):
     
     @staticmethod
     @abc.abstractmethod
-    def load(data):
-        ''' Loads raw bytes into python objects.
+    def unpack(data):
+        ''' unpacks raw bytes into python objects.
         '''
         pass
         
     @staticmethod
     @abc.abstractmethod
-    def dump(obj):
-        ''' Dumps python objects into raw bytes.
+    def pack(obj):
+        ''' packs python objects into raw bytes.
         '''
         # Note that the super() implementation here makes it possible for
         # children to support callables when parsing.
@@ -64,6 +64,11 @@ class ParserBase(metaclass=abc.ABCMeta):
             return obj()
         else:
             return obj
+            
+    @property
+    @classmethod
+    def length(cls):
+        return cls.LENGTH
         
 
 class _ParseNeat(ParserBase):
@@ -71,12 +76,12 @@ class _ParseNeat(ParserBase):
     memoryview, and a memoryview from bytes.
     '''    
     @staticmethod
-    def load(data):
+    def unpack(data):
         return bytes(data)
         
     @classmethod
-    def dump(cls, obj):
-        obj = super().dump(obj)
+    def pack(cls, obj):
+        obj = super().pack(obj)
         # This might be a good place for some type checking to fail quickly
         # if it's not bytes-like
         return memoryview(obj)
@@ -89,12 +94,12 @@ class _ParseINT8US(ParserBase):
     LENGTH = PACKER.size
     
     @classmethod
-    def load(cls, data):
+    def unpack(cls, data):
         return cls.PACKER.unpack(data)[0]
         
     @classmethod
-    def dump(cls, obj):
-        obj = super().dump(obj)
+    def pack(cls, obj):
+        obj = super().pack(obj)
         return cls.PACKER.pack(obj)
         
 
@@ -105,12 +110,12 @@ class _ParseINT16US(ParserBase):
     LENGTH = PACKER.size
     
     @classmethod
-    def load(cls, data):
+    def unpack(cls, data):
         return cls.PACKER.unpack(data)[0]
         
     @classmethod
-    def dump(cls, obj):
-        obj = super().dump(obj)
+    def pack(cls, obj):
+        obj = super().pack(obj)
         return cls.PACKER.pack(obj)
         
 
@@ -121,12 +126,12 @@ class _ParseINT32US(ParserBase):
     LENGTH = PACKER.size
     
     @classmethod
-    def load(cls, data):
+    def unpack(cls, data):
         return cls.PACKER.unpack(data)[0]
         
     @classmethod
-    def dump(cls, obj):
-        obj = super().dump(obj)
+    def pack(cls, obj):
+        obj = super().pack(obj)
         return cls.PACKER.pack(obj)
         
 
@@ -137,25 +142,25 @@ class _ParseINT64US(ParserBase):
     LENGTH = PACKER.size
     
     @classmethod
-    def load(cls, data):
+    def unpack(cls, data):
         return cls.PACKER.unpack(data)[0]
         
     @classmethod
-    def dump(cls, obj):
-        obj = super().dump(obj)
+    def pack(cls, obj):
+        obj = super().pack(obj)
         return cls.PACKER.pack(obj)
     
 
 class _ParseNone(ParserBase):
-    ''' Parses nothing. Load returns None, dump returns b''
+    ''' Parses nothing. unpack returns None, pack returns b''
     '''
     LENGTH = 0
     
     @classmethod
-    def load(cls, data):
+    def unpack(cls, data):
         return None
         
     @classmethod
-    def dump(cls, obj):
-        obj = super().dump(obj)
+    def pack(cls, obj):
+        obj = super().pack(obj)
         return b''

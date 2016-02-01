@@ -36,8 +36,6 @@ smartyparse: A python library for Muse object manipulation.
 import sys
 import collections
 
-sys.path.append('../')
-
 from smartyparse import SmartyParser
 from smartyparse import ParseHelper
     
@@ -55,7 +53,7 @@ from smartyparse.parsers import _ParseNone
 if __name__ == '__main__':
     test_format = SmartyParser()
     test_format['magic'] = ParseHelper(_ParseNeat)
-    test_format['magic'].set_length(4)
+    test_format['magic'].length = 4
     test_format['version'] = ParseHelper(_ParseINT32US)
     test_format['cipher'] = ParseHelper(_ParseINT8US)
     test_format['body1_length'] = ParseHelper(_ParseINT32US)
@@ -77,17 +75,17 @@ if __name__ == '__main__':
     print(tv1)
     print('-----------------------------------------------')
     
-    bites1 = test_format.dump(tv1)
+    bites1 = test_format.pack(tv1)
     
     print('-----------------------------------------------')
-    print('Successfully dumped.')
+    print('Successfully packed.')
     print(bytes(bites1))
     print('-----------------------------------------------')
     
-    recycle1 = test_format.load(bites1)
+    recycle1 = test_format.unpack(bites1)
     
     print('-----------------------------------------------')
-    print('Successfully reloaded.')
+    print('Successfully reunpacked.')
     print(recycle1)
     print('-----------------------------------------------')
      
@@ -103,17 +101,17 @@ if __name__ == '__main__':
     print(tv2)
     print('-----------------------------------------------')
     
-    bites2 = test_format.dump(tv2)
+    bites2 = test_format.pack(tv2)
     
     print('-----------------------------------------------')
-    print('Successfully dumped.')
+    print('Successfully packed.')
     print(bytes(bites2))
     print('-----------------------------------------------')
     
-    recycle2 = test_format.load(bites2)
+    recycle2 = test_format.unpack(bites2)
     
     print('-----------------------------------------------')
-    print('Successfully reloaded.')
+    print('Successfully reunpacked.')
     print(recycle2)
     print('-----------------------------------------------')
     
