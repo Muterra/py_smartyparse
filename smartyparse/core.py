@@ -39,7 +39,7 @@ import collections
 import inspect
 
 # Interpackage dependencies
-from .parsers import _ParseNone
+from . import parsers
 
 # ###############################################
 # Helper objects
@@ -148,6 +148,19 @@ def _smartyobject(fieldnames):
             
         def __len__(self):
             return len(self.__slots__)
+            
+        def __eq__(self, other):
+            try:
+                for key in self:
+                    if self[key] == other[key]:
+                        continue
+                    else:
+                        return False
+            except (KeyError, TypeError):
+                return False
+                
+            # Successfully managed entire thing without a bad comparison.
+            return True
             
         def clear(self):
             for key in self:
@@ -435,7 +448,7 @@ class ParseHelper(_ParsableBase):
         
     @parser.deleter
     def parser(self):
-        self._parser = _ParseNone
+        self._parser = parsers.Null
         
     @property
     def length(self):
@@ -617,7 +630,7 @@ class SmartyParser(_ParsableBase):
         # State check: length {len: X, val: ?}; data {len: None, val: ?}
         # Now unpack the length, and then this gets called:
         def postunpack_len(unpacked_length, data_name=data_name):
-            print('postunpack length ', unpacked_length)
+            # print('postunpack length ', unpacked_length)
             self._control[data_name].length = unpacked_length
         self._control[length_name].register_callback('postunpack', postunpack_len)
         # State check: length {len: X, val: n}; data {len: n, val: ?}
@@ -766,8 +779,8 @@ class SmartyParser(_ParsableBase):
                 if len(packed) < parser.offset:
                     # Too small to even start. Python will be hard-to-predict
                     # here (see above). Raise.
-                    print(this_obj)
-                    print(fieldname)
+                    # print(this_obj)
+                    # print(fieldname)
                     raise RuntimeError('Attempt to assign out of range; cannot infer padding.')
                     
                 # Redundant with pack, but not triply so. Oh well.
@@ -803,6 +816,9 @@ class SmartyParser(_ParsableBase):
                 # RESTORING THE LENGTH AND OFFSET FROM THE ORIGINAL PARSER.
                 for deferred in call_after_parse:
                     deferred()
+                    
+                # Reset the parser's offset
+                parser.offset = 0
                 
             except:
                 # Reset the position and len so that future parses don't break
@@ -877,11 +893,11 @@ class SmartyParser(_ParsableBase):
                 if fieldname not in self._exclude_from_obj:
                     unpacked[fieldname] = obj
                     
-                print('seeker   ', seeker)
-                print('newlen   ', parser.length)
-                print('slice    ', parser.slice)
-                print('data     ', bytes(data[parser.slice]))
-                print('-----------------------------------------------')
+                # print('seeker   ', seeker)
+                # print('newlen   ', parser.length)
+                # print('slice    ', parser.slice)
+                # print('data     ', bytes(data[parser.slice]))
+                # print('-----------------------------------------------')
                     
                 # Check length to add
                 seeker_advance = parser.length

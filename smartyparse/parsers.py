@@ -44,118 +44,170 @@ import collections
 class ParserBase(metaclass=abc.ABCMeta):
     length = None
     
-    @staticmethod
     @abc.abstractmethod
-    def unpack(data):
+    def unpack(self, data):
         ''' unpacks raw bytes into python objects.
         '''
         pass
         
-    @staticmethod
     @abc.abstractmethod
-    def pack(obj):
+    def pack(self, obj):
         ''' packs python objects into raw bytes.
         '''
         # Note that the super() implementation here makes it possible for
         # children to support callables when parsing.
         # If a child parser wants to customize handling a callable, don't
         # call super(). Take extra care with callable classes.
-        if callable(obj):
-            return obj()
+        return obj
+            
+            
+class _StructParserBase(ParserBase):
+    def __init__(self, endian, descriptor):
+        if endian == 'big':
+            e = '>'
+        elif endian == 'little':
+            e = '<'
         else:
-            return obj
+            raise ValueError('endian must be "big" or "little".')
+            
+        self._packer = struct.Struct(e + descriptor)
+    
+    @property
+    def length(self):
+        return self._packer.size
+    
+    def unpack(self, data):
+        return self._packer.unpack(data)[0]
+        
+    def pack(self, obj):
+        obj = super().pack(obj)
+        return self._packer.pack(obj)
         
 
-class _ParseNeat(ParserBase):
-    ''' Class for no parsing necessary. Creates a bytes object from a 
+class Blob(ParserBase):
+    ''' Class for a binary blob. Creates a bytes object from a 
     memoryview, and a memoryview from bytes.
     '''    
-    @staticmethod
-    def unpack(data):
-        return bytes(data)
+    def __init__(self, length=None):
+        self._length = None
         
-    @classmethod
-    def pack(cls, obj):
-        obj = super().pack(obj)
-        # This might be a good place for some type checking to fail quickly
-        # if it's not bytes-like
-        return memoryview(obj)
-        
-
-class _ParseINT8US(ParserBase):
-    ''' Parse an 8-bit unsigned integer.
-    '''
-    PACKER = struct.Struct('>B')
-    length = PACKER.size
+    @property
+    def length(self):
+        return self._length
     
-    @classmethod
-    def unpack(cls, data):
-        return cls.PACKER.unpack(data)[0]
+    def unpack(self, data):
+        if self.length != None and len(data) != self.length:
+            raise ValueError('Data length does not match fixed-length blob parser.')
         
-    @classmethod
-    def pack(cls, obj):
-        obj = super().pack(obj)
-        return cls.PACKER.pack(obj)
+        # Efficiently expose the data
+        return memoryview(data)
         
-
-class _ParseINT16US(ParserBase):
-    ''' Parse a 16-bit unsigned integer.
-    '''
-    PACKER = struct.Struct('>H')
-    length = PACKER.size
-    
-    @classmethod
-    def unpack(cls, data):
-        return cls.PACKER.unpack(data)[0]
+    def pack(self, obj):
+        if self.length != None and len(obj) != self.length:
+            raise ValueError('Data length does not match fixed-length blob parser.')
         
-    @classmethod
-    def pack(cls, obj):
-        obj = super().pack(obj)
-        return cls.PACKER.pack(obj)
-        
-
-class _ParseINT32US(ParserBase):
-    ''' Parse a 32-bit unsigned integer.
-    '''
-    PACKER = struct.Struct('>I')
-    length = PACKER.size
-    
-    @classmethod
-    def unpack(cls, data):
-        return cls.PACKER.unpack(data)[0]
-        
-    @classmethod
-    def pack(cls, obj):
-        obj = super().pack(obj)
-        return cls.PACKER.pack(obj)
-        
-
-class _ParseINT64US(ParserBase):
-    ''' Parse a 64-bit unsigned integer.
-    '''
-    PACKER = struct.Struct('>Q')
-    length = PACKER.size
-    
-    @classmethod
-    def unpack(cls, data):
-        return cls.PACKER.unpack(data)[0]
-        
-    @classmethod
-    def pack(cls, obj):
-        obj = super().pack(obj)
-        return cls.PACKER.pack(obj)
+        # Try to freeze the data
+        if isinstance(obj, memoryview):
+            out = bytes(obj)
+        elif isinstance(obj, bytearray):
+            out = bytes(obj)
+        else:
+            out = obj
+            
+        return super().pack(out)
     
 
-class _ParseNone(ParserBase):
+class Null(ParserBase):
     ''' Parses nothing. unpack returns None, pack returns b''
     '''
     length = 0
     
-    @classmethod
-    def unpack(cls, data):
+    def unpack(self, data):
         return None
         
-    @classmethod
-    def pack(cls, obj):
+    def pack(self, obj):
         obj = super().pack(obj)
         return b''
+        
+
+class Int8(_StructParserBase):
+    ''' Create a parser for an 8-bit integer.
+    '''
+    def __init__(self, signed=True, endian='big'):
+        if signed:
+            desc = 'b'
+        else:
+            desc = 'B'
+            
+        super().__init__(endian, desc)
+        
+
+class Int16(_StructParserBase):
+    ''' Create a parser for a 16-bit integer.
+    '''
+    def __init__(self, signed=True, endian='big'):
+        if signed:
+            desc = 'h'
+        else:
+            desc = 'H'
+            
+        super().__init__(endian, desc)
+        
+
+class Int32(_StructParserBase):
+    ''' Create a parser for a 32-bit integer.
+    '''
+    def __init__(self, signed=True, endian='big'):
+        if signed:
+            desc = 'i'
+        else:
+            desc = 'I'
+            
+        super().__init__(endian, desc)
+        
+
+class Int64(_StructParserBase):
+    ''' Create a parser for a 32-bit integer.
+    '''
+    def __init__(self, signed=True, endian='big'):
+        if signed:
+            desc = 'q'
+        else:
+            desc = 'Q'
+            
+        super().__init__(endian, desc)
+        
+
+class Float(_StructParserBase):
+    ''' Create a parser for a floating-point decimal (4 bytes). 
+    double=True creates a double precision float.
+    '''
+    def __init__(self, double=False, endian='big'):
+        if double:
+            desc = 'd'
+        else:
+            desc = 'f'
+            
+        super().__init__(endian, desc)
+        
+
+class ByteBool(_StructParserBase):
+    ''' Create a parser for a byte-oriented boolean.
+    '''
+    def __init__(self, endian='big'):
+        super().__init__(endian, '?')
+        
+
+class String(ParserBase):
+    ''' Create a parser for a byte-oriented boolean.
+    '''
+    def __init__(self, encoding='utf-8'):
+        # Test the encoding before applying it
+        __ = str.encode('hello', encoding=encoding)
+        self.encoding = encoding
+    
+    def unpack(self, data):
+        return bytes.decode(data, encoding=self.encoding)
+        
+    def pack(self, obj):
+        return str.encode(obj, encoding=self.encoding)

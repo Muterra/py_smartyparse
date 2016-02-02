@@ -35,34 +35,36 @@ smartyparse: A python library for Muse object manipulation.
 
 import sys
 import collections
+import copy
 
 from smartyparse import SmartyParser
 from smartyparse import ParseHelper
     
-from smartyparse.parsers import _ParseNeat
-from smartyparse.parsers import _ParseINT8US
-from smartyparse.parsers import _ParseINT16US
-from smartyparse.parsers import _ParseINT32US
-from smartyparse.parsers import _ParseINT64US
-from smartyparse.parsers import _ParseNone
-
+from smartyparse.parsers import Blob
+from smartyparse.parsers import Int8
+from smartyparse.parsers import Int16
+from smartyparse.parsers import Int32
+from smartyparse.parsers import Int64
+from smartyparse.parsers import Null
 
 # ###############################################
 # Setup
 # ###############################################
 
-
 test_format = SmartyParser()
-test_format['magic'] = ParseHelper(_ParseNeat)
-test_format['magic'].length = 4
-test_format['version'] = ParseHelper(_ParseINT32US)
-test_format['cipher'] = ParseHelper(_ParseINT8US)
-test_format['body1_length'] = ParseHelper(_ParseINT32US)
-test_format['body1'] = ParseHelper(_ParseNeat)
-test_format['body2_length'] = ParseHelper(_ParseINT32US)
-test_format['body2'] = ParseHelper(_ParseNeat)
+test_format['magic'] = ParseHelper(Blob(length=4))
+test_format['version'] = ParseHelper(Int32(signed=False))
+test_format['cipher'] = ParseHelper(Int8(signed=False))
+test_format['body1_length'] = ParseHelper(Int32(signed=False))
+test_format['body1'] = ParseHelper(Blob())
+test_format['body2_length'] = ParseHelper(Int32(signed=False))
+test_format['body2'] = ParseHelper(Blob())
 test_format.link_length('body1', 'body1_length')
 test_format.link_length('body2', 'body2_length')
+    
+test_nest = SmartyParser()
+test_nest['first'] = test_format
+test_nest['second'] = test_format
  
 tv1 = {}
 tv1['magic'] = b'[00]'
@@ -78,17 +80,50 @@ tv2['cipher'] = 2
 tv2['body1'] = b'[new test byte string, first]'
 tv2['body2'] = b'[new test byte string, 2nd]'
 
+tv3 = {'first': copy.deepcopy(tv1), 'second': copy.deepcopy(tv2)}
 
 # ###############################################
 # Testing
 # ###############################################
 
-
 def test():
+    # ------------------------------------------------------------------
+    # Test serial loading
+    # ------------------------------------------------------------------
+    
+    # Test first vector
     bites1 = test_format.pack(tv1)
     recycle1 = test_format.unpack(bites1)
+    assert recycle1 == tv1
+    
+    # Test second vector
     bites2 = test_format.pack(tv2)
     recycle2 = test_format.unpack(bites2)
+    assert recycle2 == tv2
+    
+    # Test nested vector
+    bites3 = test_nest.pack(tv3)
+    recycle3 = test_nest.unpack(bites3)
+    assert recycle3 == tv3
+    
+    # ------------------------------------------------------------------
+    # Test serial loading
+    # ------------------------------------------------------------------
+    
+    # Setup vectors
+    bites1 = test_format.pack(tv1)
+    bites2 = test_format.pack(tv2)
+    bites3 = test_nest.pack(tv3)
+    
+    # Recycle vectors
+    recycle1 = test_format.unpack(bites1)
+    recycle2 = test_format.unpack(bites2)
+    recycle3 = test_nest.unpack(bites3)
+    
+    # Assertions
+    assert recycle1 == tv1
+    assert recycle2 == tv2
+    assert recycle3 == tv3
     
                 
 if __name__ == '__main__':

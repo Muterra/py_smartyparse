@@ -23,3 +23,18 @@ Smartyparse has no external dependencies at this time (beyond the standard libra
     
 # Example usage
 
+Coming soon.
+
+# Todo
+
+(In no particular order)
+
++ Support bit orientation
++ Support endianness of binary blobs (aka transforming from little to big)
++ Support memoization of static SmartyParsers for extremely performant parsing
++ Support memoization of partially-static smartyparsers for better-than-completely-dynamic parsing
+
+# Misc API notes
+
++ For strings, all Python standard encodings are supported. See [here](https://docs.python.org/3/library/codecs.html#standard-encodings) for their string representations.
++ Strings do not currently support fixed lengths. Instead, use a fixed-length binary blob and pre-encode the data using str.encode (pre-decode using bytes.decode). This can be done using a pre-pack/pre-unpack callback, if so desired.

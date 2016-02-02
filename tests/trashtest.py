@@ -38,30 +38,30 @@ import collections
 
 from smartyparse import SmartyParser
 from smartyparse import ParseHelper
+from smartyparse import parsers
     
-from smartyparse.parsers import _ParseNeat
-from smartyparse.parsers import _ParseINT8US
-from smartyparse.parsers import _ParseINT16US
-from smartyparse.parsers import _ParseINT32US
-from smartyparse.parsers import _ParseINT64US
-from smartyparse.parsers import _ParseNone
+from smartyparse.parsers import Blob
+from smartyparse.parsers import Int8
+from smartyparse.parsers import Int16
+from smartyparse.parsers import Int32
+from smartyparse.parsers import Int64
+from smartyparse.parsers import Null
 
 # ###############################################
 # Testing
 # ###############################################
                 
 if __name__ == '__main__':
-    test_format = SmartyParser()
-    test_format['magic'] = ParseHelper(_ParseNeat)
-    test_format['magic'].length = 4
-    test_format['version'] = ParseHelper(_ParseINT32US)
-    test_format['cipher'] = ParseHelper(_ParseINT8US)
-    test_format['body1_length'] = ParseHelper(_ParseINT32US)
-    test_format['body1'] = ParseHelper(_ParseNeat)
-    test_format['body2_length'] = ParseHelper(_ParseINT32US)
-    test_format['body2'] = ParseHelper(_ParseNeat)
-    test_format.link_length('body1', 'body1_length')
-    test_format.link_length('body2', 'body2_length')
+    tf_1 = SmartyParser()
+    tf_1['magic'] = ParseHelper(Blob(length=4))
+    tf_1['version'] = ParseHelper(Int32(signed=False))
+    tf_1['cipher'] = ParseHelper(Int8(signed=False))
+    tf_1['body1_length'] = ParseHelper(Int32(signed=False))
+    tf_1['body1'] = ParseHelper(Blob())
+    tf_1['body2_length'] = ParseHelper(Int32(signed=False))
+    tf_1['body2'] = ParseHelper(Blob())
+    tf_1.link_length('body1', 'body1_length')
+    tf_1.link_length('body2', 'body2_length')
      
     tv1 = {}
     tv1['magic'] = b'[00]'
@@ -78,8 +78,8 @@ if __name__ == '__main__':
     tv2['body2'] = b'[new test byte string, 2nd]'
     
     test_nest = SmartyParser()
-    test_nest['first'] = test_format
-    test_nest['second'] = test_format
+    test_nest['first'] = tf_1
+    test_nest['second'] = tf_1
     
     tv3 = {'first': tv1, 'second': tv2}
     
@@ -87,12 +87,12 @@ if __name__ == '__main__':
     print('Starting TV1, serial...')
     print('    ', tv1)
     
-    bites1 = test_format.pack(tv1)
+    bites1 = tf_1.pack(tv1)
     
     print('Successfully packed.')
     print('    ', bytes(bites1))
     
-    recycle1 = test_format.unpack(bites1)
+    recycle1 = tf_1.unpack(bites1)
     
     print('Successfully reunpacked.')
     print(recycle1)
@@ -102,12 +102,12 @@ if __name__ == '__main__':
     print('Starting TV2, serial...')
     print('    ', tv2)
     
-    bites2 = test_format.pack(tv2)
+    bites2 = tf_1.pack(tv2)
     
     print('Successfully packed.')
     print('    ', bytes(bites2))
     
-    recycle2 = test_format.unpack(bites2)
+    recycle2 = tf_1.unpack(bites2)
     
     print('Successfully reunpacked.')
     print(recycle2)
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     print('Starting TV1, parallel...')
     print('    ', tv1)
     
-    bites1 = test_format.pack(tv1)
+    bites1 = tf_1.pack(tv1)
     
     print('Successfully packed TV1.')
     print('    ', bytes(bites1))
@@ -126,19 +126,19 @@ if __name__ == '__main__':
     print('Starting TV2, parallel...')
     print('    ', tv2)
     
-    bites2 = test_format.pack(tv2)
+    bites2 = tf_1.pack(tv2)
     
     print('Successfully packed TV2.')
     print('    ', bytes(bites2))
     print('-----------------------------------------------')
     
-    recycle1 = test_format.unpack(bites1)
+    recycle1 = tf_1.unpack(bites1)
     
     print('-----------------------------------------------')
     print('Successfully reunpacked TV1.')
     print(recycle1)
     
-    recycle2 = test_format.unpack(bites2)
+    recycle2 = tf_1.unpack(bites2)
     
     print('-----------------------------------------------')
     print('Successfully reunpacked TV2.')
