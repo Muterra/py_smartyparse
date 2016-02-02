@@ -101,6 +101,14 @@ class _CallHelper():
 def _smartyobject(fieldnames):
     ''' Class generator function for SmartyParser objects.
     '''
+    # # Handle fieldnames
+    # stripped_fieldnames = []
+    # for fieldname in fieldnames:
+    #     s = str(fieldname)
+    #     if not s.isidentifier():
+    #         s = '__' + s
+    #     stripped_fieldnames.append(s)
+    
     class SmartyParseObject():
         ''' Memory-efficient dict-like unordered object that allows 
         access through both attributes and __getitem__.

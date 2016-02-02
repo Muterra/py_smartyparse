@@ -182,7 +182,7 @@ class Float(_StructParserBase):
     ''' Create a parser for a floating-point decimal (4 bytes). 
     double=True creates a double precision float.
     '''
-    def __init__(self, double=False, endian='big'):
+    def __init__(self, double=True, endian='big'):
         if double:
             desc = 'd'
         else:
@@ -207,7 +207,8 @@ class String(ParserBase):
         self.encoding = encoding
     
     def unpack(self, data):
-        return bytes.decode(data, encoding=self.encoding)
+        # Don't forget to recast, in cast of memoryview
+        return bytes.decode(bytes(data), encoding=self.encoding)
         
     def pack(self, obj):
         return str.encode(obj, encoding=self.encoding)

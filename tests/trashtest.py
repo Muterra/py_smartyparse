@@ -35,6 +35,7 @@ smartyparse: A python library for Muse object manipulation.
 
 import sys
 import collections
+import copy
 
 from smartyparse import SmartyParser
 from smartyparse import ParseHelper
@@ -52,6 +53,7 @@ from smartyparse.parsers import Null
 # ###############################################
                 
 if __name__ == '__main__':
+    # Generic format
     tf_1 = SmartyParser()
     tf_1['magic'] = ParseHelper(Blob(length=4))
     tf_1['version'] = ParseHelper(Int32(signed=False))
@@ -62,6 +64,26 @@ if __name__ == '__main__':
     tf_1['body2'] = ParseHelper(Blob())
     tf_1.link_length('body1', 'body1_length')
     tf_1.link_length('body2', 'body2_length')
+    
+    tf_nest = SmartyParser()
+    tf_nest['first'] = tf_1
+    tf_nest['second'] = tf_1
+    
+    # More exhaustive, mostly deterministic format
+    tf_2 = SmartyParser()
+    tf_2['_0'] = ParseHelper(parsers.Null())
+    tf_2['_1'] = ParseHelper(parsers.Int8(signed=True))
+    tf_2['_2'] = ParseHelper(parsers.Int8(signed=False))
+    tf_2['_3'] = ParseHelper(parsers.Int16(signed=True))
+    tf_2['_4'] = ParseHelper(parsers.Int16(signed=False))
+    tf_2['_5'] = ParseHelper(parsers.Int32(signed=True))
+    tf_2['_6'] = ParseHelper(parsers.Int32(signed=False))
+    tf_2['_7'] = ParseHelper(parsers.Int64(signed=True))
+    tf_2['_8'] = ParseHelper(parsers.Int64(signed=False))
+    tf_2['_9'] = ParseHelper(parsers.Float(double=False))
+    tf_2['_10'] = ParseHelper(parsers.Float())
+    tf_2['_11'] = ParseHelper(parsers.ByteBool())
+    tf_2['_12'] = ParseHelper(parsers.String())
      
     tv1 = {}
     tv1['magic'] = b'[00]'
@@ -77,11 +99,37 @@ if __name__ == '__main__':
     tv2['body1'] = b'[new test byte string, first]'
     tv2['body2'] = b'[new test byte string, 2nd]'
     
-    test_nest = SmartyParser()
-    test_nest['first'] = tf_1
-    test_nest['second'] = tf_1
+    tv3 = {'first': copy.deepcopy(tv1), 'second': copy.deepcopy(tv2)}
     
-    tv3 = {'first': tv1, 'second': tv2}
+    tv4 = {}
+    tv4['_0'] = None
+    tv4['_1'] = -10
+    tv4['_2'] = 11
+    tv4['_3'] = -300
+    tv4['_4'] = 301
+    tv4['_5'] = -100000
+    tv4['_6'] = 100001
+    tv4['_7'] = -10000000000
+    tv4['_8'] = 10000000001
+    tv4['_9'] = 11.11
+    tv4['_10'] = 1e-50
+    tv4['_11'] = True
+    tv4['_12'] = 'EOF'
+    
+    print('-----------------------------------------------')
+    print('Testing all "other" parsers...')
+    print('    ', tv4)
+    
+    bites4 = tf_2.pack(tv4)
+    
+    print('Successfully packed.')
+    print('    ', bytes(bites4))
+    
+    recycle4 = tf_2.unpack(bites4)
+    
+    print('Successfully reunpacked.')
+    print(recycle4)
+    print('-----------------------------------------------')
     
     print('-----------------------------------------------')
     print('Starting TV1, serial...')
@@ -150,14 +198,14 @@ if __name__ == '__main__':
     print(tv3)
     print('-----------------------------------------------')
     
-    bites3 = test_nest.pack(tv3)
+    bites3 = tf_nest.pack(tv3)
     
     print('-----------------------------------------------')
     print('Successfully packed.')
     print(bytes(bites3))
     print('-----------------------------------------------')
     
-    recycle3 = test_nest.unpack(bites3)
+    recycle3 = tf_nest.unpack(bites3)
     
     print('-----------------------------------------------')
     print('Successfully reunpacked.')

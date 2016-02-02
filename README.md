@@ -38,3 +38,5 @@ Coming soon.
 
 + For strings, all Python standard encodings are supported. See [here](https://docs.python.org/3/library/codecs.html#standard-encodings) for their string representations.
 + Strings do not currently support fixed lengths. Instead, use a fixed-length binary blob and pre-encode the data using str.encode (pre-decode using bytes.decode). This can be done using a pre-pack/pre-unpack callback, if so desired.
++ SmartyParser fieldnames currently **must** be valid identifier strings (anything you could assign as an attribute). If you want to programmatically check validity, use ```'foo'.isidentifier()```, but SmartyParser will raise an error if you try to assign an invalid fieldname. This is the result of using ```__slots__``` for some memory optimization, which is a compromise between default dict behavior and memory use. If you're parsing a ton of objects, it will be very helpful for memory consumption.
++ Due to numeric imprecision, floats and doubles can potentially break equivalence (ie ```start == reloaded```) when comparing the before and after of packing -> unpacking the same object.
