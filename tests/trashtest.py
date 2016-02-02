@@ -67,52 +67,101 @@ if __name__ == '__main__':
     tv1['magic'] = b'[00]'
     tv1['version'] = 1
     tv1['cipher'] = 2
-    tv1['body1'] = b'[test byte string, first]'
-    tv1['body2'] = b'[test byte string, 2nd]'
+    tv1['body1'] = b'[tv1 byte string, first]'
+    tv1['body2'] = b'[tv1 byte string, 2nd]'
+     
+    tv2 = {}
+    tv2['magic'] = b'[aa]'
+    tv2['version'] = 5
+    tv2['cipher'] = 6
+    tv2['body1'] = b'[new test byte string, first]'
+    tv2['body2'] = b'[new test byte string, 2nd]'
+    
+    test_nest = SmartyParser()
+    test_nest['first'] = test_format
+    test_nest['second'] = test_format
+    
+    tv3 = {'first': tv1, 'second': tv2}
     
     print('-----------------------------------------------')
-    print('Starting TV1...')
-    print(tv1)
-    print('-----------------------------------------------')
+    print('Starting TV1, serial...')
+    print('    ', tv1)
     
     bites1 = test_format.pack(tv1)
     
-    print('-----------------------------------------------')
     print('Successfully packed.')
-    print(bytes(bites1))
+    print('    ', bytes(bites1))
+    
+    recycle1 = test_format.unpack(bites1)
+    
+    print('Successfully reunpacked.')
+    print(recycle1)
+    print('-----------------------------------------------')
+    
+    print('-----------------------------------------------')
+    print('Starting TV2, serial...')
+    print('    ', tv2)
+    
+    bites2 = test_format.pack(tv2)
+    
+    print('Successfully packed.')
+    print('    ', bytes(bites2))
+    
+    recycle2 = test_format.unpack(bites2)
+    
+    print('Successfully reunpacked.')
+    print(recycle2)
+    print('-----------------------------------------------')
+    
+    print('-----------------------------------------------')
+    print('Starting TV1, parallel...')
+    print('    ', tv1)
+    
+    bites1 = test_format.pack(tv1)
+    
+    print('Successfully packed TV1.')
+    print('    ', bytes(bites1))
+    
+    print('-----------------------------------------------')
+    print('Starting TV2, parallel...')
+    print('    ', tv2)
+    
+    bites2 = test_format.pack(tv2)
+    
+    print('Successfully packed TV2.')
+    print('    ', bytes(bites2))
     print('-----------------------------------------------')
     
     recycle1 = test_format.unpack(bites1)
     
     print('-----------------------------------------------')
-    print('Successfully reunpacked.')
+    print('Successfully reunpacked TV1.')
     print(recycle1)
-    print('-----------------------------------------------')
-     
-    tv2 = {}
-    tv2['magic'] = b'[aa]'
-    tv2['version'] = 1
-    tv2['cipher'] = 2
-    tv2['body1'] = b'[new test byte string, first]'
-    tv2['body2'] = b'[new test byte string, 2nd]'
-    
-    print('-----------------------------------------------')
-    print('Starting TV2...')
-    print(tv2)
-    print('-----------------------------------------------')
-    
-    bites2 = test_format.pack(tv2)
-    
-    print('-----------------------------------------------')
-    print('Successfully packed.')
-    print(bytes(bites2))
-    print('-----------------------------------------------')
     
     recycle2 = test_format.unpack(bites2)
     
     print('-----------------------------------------------')
-    print('Successfully reunpacked.')
+    print('Successfully reunpacked TV2.')
     print(recycle2)
+    
+    print('-----------------------------------------------')
+    print('-----------------------------------------------')
+    print('Starting (nested) TV3...')
+    print(tv3)
+    print('-----------------------------------------------')
+    
+    bites3 = test_nest.pack(tv3)
+    
+    print('-----------------------------------------------')
+    print('Successfully packed.')
+    print(bytes(bites3))
+    print('-----------------------------------------------')
+    
+    recycle3 = test_nest.unpack(bites3)
+    
+    print('-----------------------------------------------')
+    print('Successfully reunpacked.')
+    print(recycle3)
     print('-----------------------------------------------')
     
     import IPython

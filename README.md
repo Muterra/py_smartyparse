@@ -6,6 +6,7 @@ Smartyparse is under development as part of the Ethyr encrypted email-like messa
 
 [![Code Climate](https://codeclimate.com/github/Muterra/py_smartyparse/badges/gpa.svg)](https://codeclimate.com/github/Muterra/py_smartyparse)
 [![Issue Count](https://codeclimate.com/github/Muterra/py_smartyparse/badges/issue_count.svg)](https://codeclimate.com/github/Muterra/py_smartyparse)
+[![Build Status](https://travis-ci.org/Muterra/py_smartyparse.svg?branch=master)](https://travis-ci.org/Muterra/py_smartyparse)
 
 -------------
 
@@ -15,4 +16,10 @@ Smartyparse is currently in pre-release alpha status. It *is* available on pip, 
 
     pip install --pre smartyparse
     
-Smartyparse has no external dependencies at this time (beyond the standard library).
+Smartyparse has no external dependencies at this time (beyond the standard library), though building it from source will require pandoc and pypandoc:
+
+    sudo apt-get install pandoc
+    pip install pypandoc
+    
+# Example usage
+

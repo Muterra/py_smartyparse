@@ -38,6 +38,8 @@ import abc
 import collections
 import inspect
 
+# Interpackage dependencies
+from .parsers import _ParseNone
 
 # ###############################################
 # Helper objects
@@ -193,26 +195,17 @@ def _smartyobject(fieldnames):
     return SmartyParseObject
 
 
-# ###############################################
-# SmartyParsers and ParseHelper
-# ###############################################
-
-
-class ParseHelper():
-    ''' This is a bit messy re: division of concerns. 
-    It's getting cleaner though!
-    
-    Should get rid of the messy unpack vs unpack_from, pack vs pack_into.
-    Replace with very simple slice, callback, parse combo. Will need
-    to support an optional slice override argument for packing and, I 
-    suppose, unpacking.
+class _ParsableBase(metaclass=abc.ABCMeta):
+    ''' Base class for anything parsable. Subclassed by both ParseHelper
+    and SmartyParser.
     '''
+    
     CALLBACK_FORMAT = collections.namedtuple(
             typename = 'ParseCallbackDeclaration',
             field_names = ['func', 'modify']
         )
     
-    def __init__(self, parser, offset=0, length=None, callbacks=None):
+    def __init__(self, offset=0, callbacks=None):
         ''' NOTE THE ORDER OF CALLBACK EXECUTION!
         preunpack calls on data (bytes)
         postunpack calls on object
@@ -224,10 +217,10 @@ class ParseHelper():
             'preunpack': (function func, bool modify)
         }
         '''
+        # self._slice needs to be initialized here
         self._slice = None
-        self._offset = offset
-        self._length = length
-        self._parser = parser
+        self.offset = offset
+        
         self.register_callback('prepack', None)
         self.register_callback('preunpack', None)
         self.register_callback('postpack', None)
@@ -238,52 +231,95 @@ class ParseHelper():
         for call_on, func_def in callbacks.items():
             self.register_callback(call_on=call_on, *func_def)
         
-    def unpack(self, data):
-        # Check/infer lengths. Awkwardly redundant with unpack_from, but
-        # necessary to ensure data length always matches parser length
-        self._infer_length(data)
+    def _infer_length(self, data=None):
+        ''' Attempts to infer length from the parser, or, barring that,
+        from the data itself.
+        
+        IF PASSING DATA, MAKE SURE IT'S BYTES! Otherwise, expect errors,
+        bugs, implosions, etc.
+        
+        If self._length is defined, will return that instead.
+        '''
+        # Figure out what expects what
+        self_expectation = self.length
+        parser_expectation = self.parser.length
+        try:
+            data_expectation = len(data)
+        except TypeError:
+            data_expectation = None
+        
+        # Check for consistency and decide on outputs
+        if self_expectation != None and \
+            parser_expectation != None and \
+            self_expectation != parser_expectation:
+                raise RuntimeError('Parsehelper length expectation differs '
+                                    'from parser expectation.')
+        elif self_expectation != None and \
+            data_expectation != None and \
+            self_expectation != data_expectation:
+                raise RuntimeError('Parsehelper length expectation differs '
+                                    'from data length.')
+        elif data_expectation != None and \
+            parser_expectation != None and \
+            data_expectation != parser_expectation:
+                raise RuntimeError('Parser length expectation differs '
+                                    'from data length.')
+        # Consistent lengths. Prefer parsehelper -> parser -> data
+        else:
+            result = self_expectation or parser_expectation or data_expectation
             
-        # Pre-unpack calls on data
-        # Modification vs non-modification is handled by the CallHelper
-        data = self._callback_preunpack(data)
+        # And finally, update our length
+        self.length = result
         
-        # Parse data -> obj
-        obj = self._parser.unpack(data)
+    @property
+    def length(self):
+        # __len__ MUST return something interpretable as int. If 
+        # self._length is None, this raises an error. Use this property 
+        # instead of defining __len__ or returning an ambiguous zero.
+        return self._length
         
-        # Post-unpack calls on obj
-        # Modification vs non-modification is handled by the CallHelper
-        obj = self._callback_postunpack(obj)
+    @length.setter
+    def length(self, length):
+        self._length = length
         
-        return obj
+    @length.deleter
+    def length(self):
+        self._length = None
         
-    def unpack_from(self, data):
-        # Awkwardly redundant with unpack, but necessary for slice handling.
-        self._infer_length(data)
-        self._build_slice()
-        return self.unpack(raw[self._slice])
+    @property
+    def offset(self):
+        '''
+        '''
+        return self._offset
         
-    def pack(self, obj):
-        # Pre-pack calls on obj
-        # Modification vs non-modification is handled by the CallHelper
-        obj = self._callback_prepack(obj)
+    @offset.setter
+    def offset(self, offset):
+        # Will need to be wrapped if used in callback
+        self._offset = offset
         
-        # Parse obj -> data
-        data = self._parser.pack(obj)
+    @offset.deleter
+    def offset(self):
+        # Call this on the proper setter and we can subclass intelligently
+        self.offset = 0
         
-        # Post-pack calls on data
-        # Modification vs non-modification is handled by the CallHelper
-        data = self._callback_postpack(data)
+    @property
+    def slice(self):
+        return self._slice
+        
+    def _build_slice(self, pack_into=None, open_ended=False):
+        start = self.offset
+        length = self.length or 0
+        
+        # Catch lengths of none as zero, and if slice will be
+        # out-of-bounds on pack_into, slice open-ended
+        if open_ended or \
+            self.length == None or \
+            pack_into != None and len(pack_into) < length + start:
+                stop = None
+        else:
+            stop = start + length
             
-        # Now infer/check length and return
-        self._infer_length(data)
-        return data
-        
-    def pack_into(self, obj, into, override_slice=False):
-        if override_slice:
-            into[override_slice] = self.pack(obj)
-        else: 
-            self._build_slice()
-            into[self._slice] = self.pack(obj)
+        self._slice = slice(start, stop)
         
     def register_callback(self, call_on, func, modify=False):
         if call_on == 'preunpack':
@@ -348,109 +384,195 @@ class ParseHelper():
         self._callback_postpack = _CallHelper(*value)
         
     @property
+    @abc.abstractmethod
+    def parser(self):
+        pass
+        
+    @abc.abstractmethod
+    def pack(self, obj):
+        pass
+        
+    @abc.abstractmethod
+    def unpack(self, data):
+        pass
+        
+    def pack_padding(self, pack_into):
+        ''' Instead of packing an object, packs in padding.
+        '''
+        # First, build the slice.
+        self._build_slice(pack_into)
+        pack_into[self.slice] = bytearray(self.length or 0)
+        # And for consistency, return the packed object
+        return pack_into
+
+
+# ###############################################
+# SmartyParsers and ParseHelper
+# ###############################################
+
+
+class ParseHelper(_ParsableBase):
+    ''' This is a bit messy re: division of concerns. 
+    It's getting cleaner though!
+    
+    Should get rid of the messy unpack vs unpack_from, pack vs pack_into.
+    Replace with very simple slice, callback, parse combo. Will need
+    to support an optional slice override argument for packing and, I 
+    suppose, unpacking.
+    '''
+    def __init__(self, parser, offset=0, length=None, callbacks=None):
+        super().__init__(offset, callbacks)
+        self.parser = parser
+        self.length = length
+        
+    @property
+    def parser(self):
+        return self._parser
+        
+    @parser.setter
+    def parser(self, parser):
+        self._parser = parser
+        
+    @parser.deleter
+    def parser(self):
+        self._parser = _ParseNone
+        
+    @property
     def length(self):
         # __len__ MUST return something interpretable as int. If 
         # self._length is None, this raises an error. Use this property 
         # instead of defining __len__ or returning an ambiguous zero.
-        return self._length
+        
+        # Test self._length first, self.parser.length second
+        # Will raise later if mismatch
+        return self._length or self.parser.length
         
     @length.setter
     def length(self, length):
-        # Will need to be wrapped if used in callback
         self._length = length
         
     @length.deleter
     def length(self):
         self._length = None
         
-    @property
-    def offset(self):
-        '''
-        '''
-        return self._offset
+    def unpack(self, unpack_from):
+        # Check/infer lengths. Awkwardly redundant with unpack_from, but
+        # necessary to ensure data length always matches parser length
+        # DON'T PASS unpack_from, because it won't do any good. Known
+        # lengths are guaranteed correct and unknown lengths need to 
+        # slice to the end, which build_slice will handle.
         
-    @offset.setter
-    def offset(self, offset):
-        # Will need to be wrapped if used in callback
-        self._offset = offset
-        
-    @offset.deleter
-    def offset(self):
-        self._offset = None
-        
-    def _build_slice(self, open_ended=False):
-        start = self._offset
-        if self.length == None or open_ended:
-            stop = None
-        else:
-            stop = self._offset + self.length
-        self._slice = slice(start, stop)
-        
-    def _infer_length(self, data=None):
-        ''' Attempts to infer length from the parser, or, barring that,
-        from the data itself.
-        
-        IF PASSING DATA, MAKE SURE IT'S BYTES! Otherwise, expect errors,
-        bugs, implosions, etc.
-        
-        If self._length is defined, will return that instead.
-        '''
-        # Figure out what expects what
-        self_expectation = self.length
-        parser_expectation = self._parser.length
-        try:
-            data_expectation = len(data)
-        except TypeError:
-            data_expectation = None
-        
-        # Check for consistency and decide on outputs
-        # If we have a length defined for the ParseHelper, prefer that
-        if self_expectation != None:
-            # Return a result only if all defined lengths match
-            if (parser_expectation != None and self_expectation != parser_expectation) or \
-               (data_expectation != None and data_expectation != self_expectation):
-                    # print('self:   ', self_expectation)
-                    # print('parser: ', parser_expectation)
-                    # print('data:   ', data_expectation)
-                    raise RuntimeError('ParseHelper expected length does not '
-                                       'match both _Parser and data lengths.')
-            else: 
-                result = self_expectation
-        # If we have a length defined for the _Parser, choose that next
-        elif parser_expectation != None:
-            # Return a result only if all defined lengths match
-            if data_expectation != None and parser_expectation != data_expectation:
-                    raise RuntimeError('_Parser expected length does not '
-                                       'match data length.')
-            else: 
-                result = parser_expectation
-        # Fallback on data expectation
-        else:
-            result = data_expectation
+        self._infer_length()
+        self._build_slice()
+        data = unpack_from[self.slice]
             
-        # And finally, update our length
-        self.length = result
+        # Pre-unpack calls on data
+        # Modification vs non-modification is handled by the CallHelper
+        data = self._callback_preunpack(data)
+        
+        # Parse data -> obj
+        obj = self.parser.unpack(data)
+        
+        # Post-unpack calls on obj
+        # Modification vs non-modification is handled by the CallHelper
+        obj = self._callback_postunpack(obj)
+        
+        return obj
+        
+    def pack(self, obj, pack_into):
+        # First, build the slice.
+        self._build_slice(pack_into=pack_into)
+        
+        # Pre-pack calls on obj
+        # Modification vs non-modification is handled by the CallHelper
+        obj = self._callback_prepack(obj)
+        
+        # Parse obj -> data
+        data = self.parser.pack(obj)
+        
+        # Post-pack calls on data
+        # Modification vs non-modification is handled by the CallHelper
+        data = self._callback_postpack(data)
+            
+        # Now infer/check length and pack it into the object
+        self._infer_length(data)
+        pack_into[self.slice] = data
+        
+        # And for consistency, return the packed object
+        return pack_into
         
     def __repr__(self):
         ''' Some limited handling of subclasses is included.
         '''
         c = type(self).__name__
-        return c + '(parser=' + repr(self._parser) + ', ' + \
+        return c + '(parser=' + repr(self.parser) + ', ' + \
                     'offset=' + repr(self.offset) + ', ' + \
                     'length=' + repr(self.length) + ', ' + \
                     'callbacks=' + repr(self.callbacks) + ')'
 
 
-class SmartyParser():
+class SmartyParser(_ParsableBase):
     ''' One-stop shop for easy parsing. No muss, no fuss, just coconuts.
     '''
-    def __init__(self):
+    def __init__(self, offset=0, callbacks=None):
+        # Initialize offset.
+        # This is required to prevent race condition / call before assignment
+        # in super, because offset.setter references offset.
+        self._offset = 0
+        
         self._control = collections.OrderedDict()
+        self.length = None
         self._exclude_from_obj = set()
         # This will instantiate self._obj with an empty object definition.
         self._update_obj()
         # This is a little ghetto but whatever?
         self._defer_eval = ({}, {})
+        
+        # Call this last so that self._control doesn't wig out
+        super().__init__(offset, callbacks)
+        
+    def __setitem__(self, name, value):
+        ''' These are necessary to remember parsing order.
+        '''
+        self._control[name] = value
+        self._update_obj()
+        self._defer_eval[1][name] = []
+        
+    def __getitem__(self, name):
+        ''' These are necessary to remember parsing order.
+        '''
+        return self._control[name]
+        
+    def __delitem__(self, name):
+        ''' These are necessary to remember parsing order.
+        '''
+        del self._control[name]
+        self._update_obj()
+        
+    def _infer_length(self, *args, **kwargs):
+        result = super()._infer_length(*args, **kwargs)
+        # As a last resort, try discovering if we've a static length
+        if result == None:
+            try:
+                static_length = 0
+                for parser in self._control.values():
+                    static_length += parser.length
+                result = static_length
+            except TypeError:    
+                pass
+        self.length = result
+        
+    @property
+    def parser(self):
+        # Smartyparsers are their own parsers.
+        return self
+        
+    @property
+    def obj(self):
+        ''' Defines the required data format for packing something, or 
+        what is returned when unpacking data.
+        '''
+        return self._obj
         
     @property
     def _exclude_from_obj(self):
@@ -490,14 +612,13 @@ class SmartyParser():
                 raise ValueError('Lengths cannot follow their linked data, or objects '
                                  'would be impossible to unpack.')
         
-        # ------------ Loading management ------------------------------
+        # ------------ Unpacking management ----------------------------
         # Before unpacking the length field, we know basically nothing.
         # State check: length {len: X, val: ?}; data {len: None, val: ?}
         # Now unpack the length, and then this gets called:
         def postunpack_len(unpacked_length, data_name=data_name):
-            # print('postunpack length')
+            print('postunpack length ', unpacked_length)
             self._control[data_name].length = unpacked_length
-            self._control[data_name]._build_slice()
         self._control[length_name].register_callback('postunpack', postunpack_len)
         # State check: length {len: X, val: n}; data {len: n, val: ?}
         # Now we unpack the data, resulting in...
@@ -505,12 +626,12 @@ class SmartyParser():
         # Which calls this...
         def postunpack_dat(unpacked_data, data_name=data_name):
             # print('postunpack data')
-            del self._control[data_name].length
-            self._control[data_name]._build_slice()
+            pass
+            # del self._control[data_name].length
         self._control[data_name].register_callback('postunpack', postunpack_dat)
         # Which resets data to its original state.
         
-        # ------------ packing management ------------------------------
+        # ------------ Packing management ------------------------------
         # Before packing the data field, we know basically nothing.
         # BUT, we need to enforce that against previous calls, which may
         # have left a residual length in the parser from _infer_length()
@@ -536,32 +657,34 @@ class SmartyParser():
         self._exclude_from_obj.add(length_name)
         self._defer_eval[0][length_name] = data_name
         
-    @property
-    def obj(self):
-        ''' Defines the required data format for packing something, or 
-        what is returned when unpacking data.
-        '''
-        return self._obj
+    def _generate_deferred(self, fieldname, parser, obj, pack_into):
+        # Figure out what parser we wait for
+        waitfor = self._defer_eval[0][fieldname]
+        # Save state with that parser's _defer_eval
         
-    def __setitem__(self, name, value):
-        ''' These are necessary to remember parsing order.
-        '''
-        self._control[name] = value
-        self._update_obj()
-        self._defer_eval[1][name] = []
+        def deferred_call(fieldname=fieldname, offset=parser.offset, length=parser.length):
+            # Save the current state
+            length_buffer = self._control[fieldname].length
+            offset_buffer = self._control[fieldname].offset
+            # Restore the deferred state and run it
+            # Note: this cannot use the slice, in case open_ended=True
+            self._control[fieldname].length = length
+            self._control[fieldname].offset = offset
+            self._control[fieldname].pack(
+                obj=obj[fieldname], 
+                pack_into=pack_into)
+            # Now call anything that was waiting on us. Late-binding, 
+            # so we won't miss anything.
+            for deferred in self._defer_eval[1][fieldname]:
+                deferred()
+            # Restore the current state
+            self._control[fieldname].length = length_buffer
+            self._control[fieldname].offset = offset_buffer
         
-    def __getitem__(self, name):
-        ''' These are necessary to remember parsing order.
-        '''
-        return self._control[name]
+        # Add that function into the appropriate register
+        self._defer_eval[1][waitfor].append(deferred_call)
         
-    def __delitem__(self, name):
-        ''' These are necessary to remember parsing order.
-        '''
-        del self._control[name]
-        self._update_obj()
-        
-    def pack(self, obj):
+    def pack(self, obj, pack_into=None):
         ''' Automatically assembles a message from an object. The object
         must have data accessible via __getitem__(key), with keys
         matching the SmartyParser definition.
@@ -615,58 +738,52 @@ class SmartyParser():
         
         # This should eventually be done with more intelligent preallocation
         # than a blatant punt
-        pack_into = bytearray()
+        packed = bytearray()
+        # Cannot do pack_into = pack_into or bytearray() because empty
+        # bytearray evaluates to False.
         
         # Use this to control the "cursor" position
+        # seeker = self.offset
         seeker = 0
         
+        # Pre-pack calls on obj
+        # Modification vs non-modification is handled by the CallHelper
+        obj = self._callback_prepack(obj)
+        
         for fieldname, parser in self._control.items():
-            data = obj[fieldname]
+            this_obj = obj[fieldname]
             call_after_parse = []
+            padding = b''
             
             # Try/finally: must be sure to reset slice offset to stay atomic-ish
             try:
                 # Save length to restore later
                 oldlen = parser.length
-                oldoffset = parser.offset
-                # Don't forget this comes after the state save
-                parser.offset += seeker
-                # Redundant with pack, but not triply so. Oh well.
-                parser._infer_length()
-                parser._build_slice()
-                # Initialize
-                seeker_advance = 0
                 
+                # Don't forget this comes after the state save
+                parser.offset = seeker
                 # Check to see if the bytearray is large enough
-                if len(pack_into) < parser.offset:
+                if len(packed) < parser.offset:
                     # Too small to even start. Python will be hard-to-predict
                     # here (see above). Raise.
+                    print(this_obj)
+                    print(fieldname)
                     raise RuntimeError('Attempt to assign out of range; cannot infer padding.')
+                    
+                # Redundant with pack, but not triply so. Oh well.
+                parser._infer_length()
+                seeker_advance = parser.length or 0
                     
                 # Check to see if this is a delayed execution thingajobber
                 if fieldname in self._defer_eval[0]:
-                    self._generate_deferred(fieldname, parser, obj, pack_into)
-                    # And don't forget to override parsing and lookup.
-                    # If the object is too small for the next field, pad it out
-                    if len(pack_into) < parser._slice.stop:
-                        pack_into[parser.offset:] = bytearray(parser.length)
-                    
+                    self._generate_deferred(fieldname, parser, obj, packed)
+                    # Inject any needed padding.
+                    parser.pack_padding(pack_into=packed)
                 # If not delayed, add any dependent deferred evals to the todo list
                 else:
                     call_after_parse = self._defer_eval[1][fieldname]
-                    
-                    # Check the tail end *after* dealing with delayed execution
-                    # so we don't accidentally erase the slice before saving it.
-                    if parser._slice.stop != None and len(pack_into) < parser._slice.stop:
-                        # Too small, so rebuild slice to infinity
-                        parser._build_slice(open_ended=True)
-                        
-                    # Check on seeker_advance -- if, for example, with length 
-                    # link, we're about to remove a length, figure it out first
-                    seeker_advance += parser.length or 0
-                    
                     # Only do this when not deferred.
-                    parser.pack_into(data, pack_into)
+                    parser.pack(obj=this_obj, pack_into=packed)
                     
                 # Advance the seeker BEFORE the finally block resets the length
                 # But first make sure we haven't already done it
@@ -678,8 +795,8 @@ class SmartyParser():
                     # Check if we have a better value (not None). Update if so.
                     if parser.length != None:
                         seeker_advance = parser.length
+                # Advance the seeker before deferred calls in case they error.
                 seeker += seeker_advance
-                # seeker += parser.length
                 
                 # And perform any scheduled deferred calls
                 # IT IS VERY IMPORTANT TO NOTE THAT THIS HAPPENS BEFORE
@@ -687,89 +804,106 @@ class SmartyParser():
                 for deferred in call_after_parse:
                     deferred()
                 
-            finally:
+            except:
                 # Reset the position and len so that future parses don't break
                 parser.length = oldlen
-                parser.offset = oldoffset
+                parser.offset = 0
+                raise
+        
+        # Finally, call the post-pack callback and return.
+        packed = self._callback_postpack(packed)
+        
+        if pack_into == None:
+            pack_into = bytearray()
             
+        # Calculate the length from the observed difference between the 
+        # final seeker position and the start offset
+        # self.length = seeker - self.offset
+        self.length = len(packed)
+        # Now build the slice, which is only used if we're nested.
+        self._build_slice(pack_into=pack_into)
+            
+        # Freeze my own shit before returning, or we get errors.
+        pack_into[self.slice] = bytes(packed)
         return pack_into
         
-    def _generate_deferred(self, fieldname, parser, obj, pack_into):
-        # Figure out what parser we wait for
-        waitfor = self._defer_eval[0][fieldname]
-        # Save state with that parser's _defer_eval
-        
-        def deferred_call(fieldname=fieldname, loc=parser._slice):
-            # First do the delayed data evaluation
-            self._control[fieldname].pack_into(
-                obj=obj[fieldname], 
-                into=pack_into, 
-                override_slice=loc)
-            # Now call anything that was waiting on us.
-            for deferred in self._defer_eval[1][fieldname]:
-                deferred()
-        
-        # Add that function into the appropriate register
-        self._defer_eval[1][waitfor].append(deferred_call)
-        
-    def unpack(self, message):
+    def unpack(self, data):
         ''' Automatically unpacks an object from message.
         
         Returns a SmartyParseObject.
-        '''        
+        '''
         # Construct the output and reframe as memoryview for performance
         unpacked = self.obj()
-        data = memoryview(message)
+        data = memoryview(data)
+        # Force a length reset. Gross, but works. If static, will be 
+        # recalculated with _infer_length.
+        self.length = None
+        # Some other init stuff
+        self._infer_length()
+        self._build_slice()
+        # Error trap if no known length but preunpack callback:
+        if self.length == None and self.callback_preunpack[0] != None:
+            raise RuntimeError('Cannot call pre-unpack callback with '
+                                'indeterminate length. Your format may '
+                                'be impossible to explicitly unpack.')
+        
+        # We can always unambiguously call this now, thanks to above.
+        self._callback_preunpack(data[self.slice])
         
         # Use this to control the "cursor" position
-        seeker = 0
+        seeker = self.offset
         
         for fieldname, parser in self._control.items():
             # Try/finally: must be sure to reset slice offset to stay atomic-ish
             try:
                 # Save length to restore later
                 oldlen = parser.length
-                oldoffset = parser.offset
                 # Don't forget this comes after the state save
-                parser.offset += seeker
+                parser.offset = seeker
                 # Redundant with pack, but not triply so. Oh well.
                 parser._infer_length()
-                parser._build_slice()
                 
-                # Go ahead and try to parse it, catching an indexerror
-                try:
-                    sliced = data[parser._slice]
-                except IndexError:
-                    raise IndexError('Data wrong size (too small?) for parsing chain.')
-                    
-                # print('seeker   ', seeker)
-                # print('offset   ', parser.offset)
-                # print('old off  ', oldoffset)
-                # print('oldlen   ', oldlen)
-                # print('slice    ', parser._slice)
-                # print('bytelen  ', parser.length)
-                # print('slicelen ', len(sliced))
-                # print('data     ', bytes(sliced))
-                # print('unpacked   ', unpacked)
-                # print('-----------------------------------------------')
-                
-                if parser.length != None and len(sliced) != parser.length:
-                    raise ValueError('Parser slice length differs from data slice.')
+                # Previously, this is where we did this:
+                # -----
+                # # Check length to add
+                # seeker_advance = parser.length
+                # -----
+                # But, since we've removed the callback to clear the 
+                # length of any lengthlinked data field after loading,
+                # we can now move it after. Also, this was causing bugs.
                     
                 # Aight we're good to go, but only return stuff that matters
-                obj = parser.unpack(sliced)
+                obj = parser.unpack(data)
                 if fieldname not in self._exclude_from_obj:
                     unpacked[fieldname] = obj
+                    
+                print('seeker   ', seeker)
+                print('newlen   ', parser.length)
+                print('slice    ', parser.slice)
+                print('data     ', bytes(data[parser.slice]))
+                print('-----------------------------------------------')
+                    
+                # Check length to add
+                seeker_advance = parser.length
                 
                 # If we got this far, we should advance the seeker accordingly.
                 # Use sliced instead of length in case postunpack callbacks 
                 # got rid of it.
-                seeker += len(sliced)
+                seeker += seeker_advance
                 
-            finally:
+            except:
                 # Reset the position and len so that future parses don't break
                 parser.length = oldlen
-                parser.offset = oldoffset
+                parser.offset = 0
+                raise
+                
+            # Infer lengths and then check them
+            self.length = seeker - self.offset
+            self._infer_length()
             
+        # Post-unpack calls on obj
+        # Modification vs non-modification is handled by the CallHelper
+        unpacked = self._callback_postunpack(unpacked)
+        
         # Redundant if this wasn't newly created, but whatever
         return unpacked
