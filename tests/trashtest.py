@@ -65,9 +65,15 @@ if __name__ == '__main__':
     tf_1.link_length('body1', 'body1_length')
     tf_1.link_length('body2', 'body2_length')
     
+    # Nested formats
     tf_nest = SmartyParser()
     tf_nest['first'] = tf_1
     tf_nest['second'] = tf_1
+    
+    tf_nest2 = SmartyParser()
+    tf_nest2['_0'] = ParseHelper(Int32())
+    tf_nest2['_1'] = tf_1
+    tf_nest2['_2'] = ParseHelper(Int32())
     
     # More exhaustive, mostly deterministic format
     tf_2 = SmartyParser()
@@ -100,7 +106,10 @@ if __name__ == '__main__':
     tv2['body1'] = b'[new test byte string, first]'
     tv2['body2'] = b'[new test byte string, 2nd]'
     
-    tv3 = {'first': copy.deepcopy(tv1), 'second': copy.deepcopy(tv2)}
+    tv3 = {
+            'first': copy.deepcopy(tv1), 
+            'second': copy.deepcopy(tv2)
+        }
     
     tv4 = {}
     tv4['_0'] = None
@@ -118,6 +127,11 @@ if __name__ == '__main__':
     tv4['_12'] = None
     tv4['_13'] = 'EOF'
     
+    tv5 = {}
+    tv5['_0'] = 42
+    tv5['_1'] = copy.deepcopy(tv1)
+    tv5['_2'] = -42
+    
     print('-----------------------------------------------')
     print('Testing all "other" parsers...')
     print('    ', tv4)
@@ -131,6 +145,19 @@ if __name__ == '__main__':
     
     print('Successfully reunpacked.')
     print(recycle4)
+    
+    
+    print('    ', tv5)
+    
+    bites5 = tf_nest2.pack(tv5)
+    
+    print('Successfully packed.')
+    print('    ', bytes(bites5))
+    
+    recycle5 = tf_nest2.unpack(bites5)
+    
+    print('Successfully reunpacked.')
+    print(recycle5)
     print('-----------------------------------------------')
     
     print('-----------------------------------------------')

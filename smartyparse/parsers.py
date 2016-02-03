@@ -222,7 +222,7 @@ class ByteBool(_StructParserBase):
         
 
 class String(ParserBase):
-    ''' Create a parser for a byte-oriented boolean.
+    ''' Create a parser for a string.
     '''
     def __init__(self, encoding='utf-8'):
         # Test the encoding before applying it

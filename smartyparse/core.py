@@ -99,6 +99,11 @@ class _CallHelper():
         
 
 class _SPOMeta(type):
+    ''' Metaclass for SmartyParseObjects created through _smartyobject.
+    
+    Defines the class __repr__ and __str__ to expose the available
+    fieldnames there.
+    '''
     def __repr__(self):
         c = "<class 'SmartyParseObject'>: _smartyobject("
         c += str(self.__slots__)
@@ -946,6 +951,9 @@ class SmartyParser(_ParsableBase):
                 # Use sliced instead of length in case postunpack callbacks 
                 # got rid of it.
                 seeker += seeker_advance
+                
+                # Finally, reset the parser offset.
+                parser.offset = 0
                 
             except:
                 # Reset the position and len so that future parses don't break
