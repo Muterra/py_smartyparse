@@ -4,6 +4,7 @@ Smartyparse! Intelligent general-purpose binary parsing, marshalling,
 serializing, etc library. Capable of dynamic operations, self-describing
 formats, nested formats, etc.
 '''
+import sys
 
 # Always prefer setuptools over distutils
 from setuptools import setup, find_packages
@@ -13,9 +14,15 @@ from os import path
 
 here = path.abspath(path.dirname(__file__))
 
-# Get the long description from the README file
-import pypandoc
-long_description = pypandoc.convert('README.md', 'rst')
+long_description = '''Smartyparse is an intelligent general-purpose binary parsing, marshalling, 
+serializing, etc library. Capable of dynamic operations, self-describing 
+formats, nested formats, etc. Use it to encode, decode, and develop binary 
+formats quickly and easily. It supports ```python>=3.3```.'''
+# If we're installing, don't bother building the long_description
+if sys.argv[1] != 'install':
+    # Get the long description from the README file
+    import pypandoc
+    long_description = pypandoc.convert('README.md', 'rst')
 
 setup(
     name='smartyparse',
@@ -23,7 +30,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.1a1',
+    version='0.1a2',
 
     description='A python library for smart dynamic binary de/encoding.',
     long_description=long_description,
