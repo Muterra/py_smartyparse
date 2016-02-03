@@ -98,6 +98,22 @@ class _CallHelper():
         return c + '(func=' + repr(self.func) + ', modify=' + repr(self.modify) + ')'
         
 
+class _SPOMeta(type):
+    def __repr__(self):
+        c = "<class 'SmartyParseObject'>: _smartyobject("
+        c += str(self.__slots__)
+        c += ')'
+        return c
+        
+    def __str__(self):
+        s = 'SmartyParseObject class: {'
+        for fieldname in self.__slots__:
+            s += "'" + fieldname + "', "
+        s = s[:len(s) - 2]
+        s += '}'
+        return s
+        
+
 def _smartyobject(fieldnames):
     ''' Class generator function for SmartyParser objects.
     '''
@@ -109,7 +125,7 @@ def _smartyobject(fieldnames):
     #         s = '__' + s
     #     stripped_fieldnames.append(s)
     
-    class SmartyParseObject():
+    class SmartyParseObject(metaclass=_SPOMeta):
         ''' Memory-efficient dict-like unordered object that allows 
         access through both attributes and __getitem__.
         '''
