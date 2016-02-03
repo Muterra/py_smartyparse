@@ -83,7 +83,8 @@ if __name__ == '__main__':
     tf_2['_9'] = ParseHelper(parsers.Float(double=False))
     tf_2['_10'] = ParseHelper(parsers.Float())
     tf_2['_11'] = ParseHelper(parsers.ByteBool())
-    tf_2['_12'] = ParseHelper(parsers.String())
+    tf_2['_12'] = ParseHelper(parsers.Padding(length=4))
+    tf_2['_13'] = ParseHelper(parsers.String())
      
     tv1 = {}
     tv1['magic'] = b'[00]'
@@ -114,7 +115,8 @@ if __name__ == '__main__':
     tv4['_9'] = 11.11
     tv4['_10'] = 1e-50
     tv4['_11'] = True
-    tv4['_12'] = 'EOF'
+    tv4['_12'] = None
+    tv4['_13'] = 'EOF'
     
     print('-----------------------------------------------')
     print('Testing all "other" parsers...')

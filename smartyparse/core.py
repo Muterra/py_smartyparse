@@ -374,6 +374,10 @@ class _ParsableBase(metaclass=abc.ABCMeta):
     def callback_preunpack(self, value):
         self._callback_preunpack = _CallHelper(*value)
         
+    @callback_preunpack.deleter
+    def callback_preunpack(self):
+        self._callback_preunpack = _CallHelper(None)
+        
     @property
     def callback_postunpack(self):
         return self.CALLBACK_FORMAT(
@@ -383,6 +387,10 @@ class _ParsableBase(metaclass=abc.ABCMeta):
     @callback_postunpack.setter
     def callback_postunpack(self, value):
         self._callback_postunpack = _CallHelper(*value)
+        
+    @callback_postunpack.deleter
+    def callback_postunpack(self):
+        self._callback_postunpack = _CallHelper(None)
         
     @property
     def callback_prepack(self):
@@ -394,6 +402,10 @@ class _ParsableBase(metaclass=abc.ABCMeta):
     def callback_prepack(self, value):
         self._callback_prepack = _CallHelper(*value)
         
+    @callback_prepack.deleter
+    def callback_prepack(self):
+        self._callback_prepack = _CallHelper(None)
+        
     @property
     def callback_postpack(self):
         return self.CALLBACK_FORMAT(
@@ -403,6 +415,10 @@ class _ParsableBase(metaclass=abc.ABCMeta):
     @callback_postpack.setter
     def callback_postpack(self, value):
         self._callback_postpack = _CallHelper(*value)
+        
+    @callback_postpack.deleter
+    def callback_postpack(self):
+        self._callback_postpack = _CallHelper(None)
         
     @property
     @abc.abstractmethod
@@ -417,7 +433,7 @@ class _ParsableBase(metaclass=abc.ABCMeta):
     def unpack(self, data):
         pass
         
-    def pack_padding(self, pack_into):
+    def _pack_padding(self, pack_into):
         ''' Instead of packing an object, packs in padding.
         '''
         # First, build the slice.
@@ -799,7 +815,7 @@ class SmartyParser(_ParsableBase):
                 if fieldname in self._defer_eval[0]:
                     self._generate_deferred(fieldname, parser, obj, packed)
                     # Inject any needed padding.
-                    parser.pack_padding(pack_into=packed)
+                    parser._pack_padding(pack_into=packed)
                 # If not delayed, add any dependent deferred evals to the todo list
                 else:
                     call_after_parse = self._defer_eval[1][fieldname]
@@ -851,14 +867,14 @@ class SmartyParser(_ParsableBase):
         pack_into[self.slice] = bytes(packed)
         return pack_into
         
-    def unpack(self, data):
+    def unpack(self, unpack_from):
         ''' Automatically unpacks an object from message.
         
         Returns a SmartyParseObject.
         '''
         # Construct the output and reframe as memoryview for performance
         unpacked = self.obj()
-        data = memoryview(data)
+        data = memoryview(unpack_from)
         # Force a length reset. Gross, but works. If static, will be 
         # recalculated with _infer_length.
         self.length = None

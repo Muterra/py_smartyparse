@@ -58,7 +58,7 @@ class ParserBase(metaclass=abc.ABCMeta):
         # children to support callables when parsing.
         # If a child parser wants to customize handling a callable, don't
         # call super(). Take extra care with callable classes.
-        return obj
+        pass
             
             
 class _StructParserBase(ParserBase):
@@ -80,7 +80,6 @@ class _StructParserBase(ParserBase):
         return self._packer.unpack(data)[0]
         
     def pack(self, obj):
-        obj = super().pack(obj)
         return self._packer.pack(obj)
         
 
@@ -114,7 +113,32 @@ class Blob(ParserBase):
         else:
             out = obj
             
-        return super().pack(out)
+        return out
+        
+
+class Padding(ParserBase):
+    ''' Class for a padding blob. Unpacks to its length.
+    '''    
+    def __init__(self, length, padding_byte=b'\x00'):
+        self._length = length
+        self._padding = bytes(padding_byte * self.length)
+        
+    @property
+    def length(self):
+        return self._length
+    
+    def unpack(self, data):
+        if len(data) != self.length:
+            raise ValueError('Data length does not match fixed-length padding parser.')
+        # Could check the padding is 'valid' if we'd like, but no need yet
+        
+        # Always return None
+        return None
+        
+    def pack(self, obj):
+        # No object validation or anything.
+        # Return it as bytes.
+        return self._padding
     
 
 class Null(ParserBase):
@@ -126,7 +150,6 @@ class Null(ParserBase):
         return None
         
     def pack(self, obj):
-        obj = super().pack(obj)
         return b''
         
 
