@@ -813,7 +813,7 @@ class SmartyParser(_ParsableBase):
         TypeError: memoryview assignment: lvalue and rvalue have different structures
         '''
         # Add any exclusively avoided fields (currently only lengthlinked ones)
-        # into obj as None
+        # into obj as None, in case they (probably) have not been defined.
         for key in self._exclude_from_obj:
             obj[key] = None
         
@@ -838,63 +838,55 @@ class SmartyParser(_ParsableBase):
             call_after_parse = []
             padding = b''
             
-            # Try/finally: must be sure to reset slice offset to stay atomic-ish
-            try:
-                # Save length to restore later
-                oldlen = parser.length
+            # Save length to restore later
+            oldlen = parser.length
+            
+            # Don't forget this comes after the state save
+            parser.offset = seeker
+            # Check to see if the bytearray is large enough
+            if len(packed) < parser.offset:
+                # Too small to even start. Python will be hard-to-predict
+                # here (see above). Raise.
+                # print(this_obj)
+                # print(fieldname)
+                raise RuntimeError('Attempt to assign out of range; cannot infer padding.')
                 
-                # Don't forget this comes after the state save
-                parser.offset = seeker
-                # Check to see if the bytearray is large enough
-                if len(packed) < parser.offset:
-                    # Too small to even start. Python will be hard-to-predict
-                    # here (see above). Raise.
-                    # print(this_obj)
-                    # print(fieldname)
-                    raise RuntimeError('Attempt to assign out of range; cannot infer padding.')
-                    
-                # Redundant with pack, but not triply so. Oh well.
-                parser._infer_length()
-                seeker_advance = parser.length or 0
-                    
-                # Check to see if this is a delayed execution thingajobber
-                if fieldname in self._defer_eval[0]:
-                    self._generate_deferred(fieldname, parser, obj, packed)
-                    # Inject any needed padding.
-                    parser._pack_padding(pack_into=packed)
-                # If not delayed, add any dependent deferred evals to the todo list
-                else:
-                    call_after_parse = self._defer_eval[1][fieldname]
-                    # Only do this when not deferred.
-                    parser.pack(obj=this_obj, pack_into=packed)
-                    
-                # Advance the seeker BEFORE the finally block resets the length
-                # But first make sure we haven't already done it
-                if not seeker_advance:
-                    seeker_advance += parser.length or 0
-                # We do, in fact, already have a seeker_advance, but it may
-                # not be current. 
-                else:
-                    # Check if we have a better value (not None). Update if so.
-                    if parser.length != None:
-                        seeker_advance = parser.length
-                # Advance the seeker before deferred calls in case they error.
-                seeker += seeker_advance
+            # Redundant with pack, but not triply so. Oh well.
+            parser._infer_length()
+            seeker_advance = parser.length or 0
                 
-                # And perform any scheduled deferred calls
-                # IT IS VERY IMPORTANT TO NOTE THAT THIS HAPPENS BEFORE
-                # RESTORING THE LENGTH AND OFFSET FROM THE ORIGINAL PARSER.
-                for deferred in call_after_parse:
-                    deferred()
-                    
-                # Reset the parser's offset
-                parser.offset = 0
+            # Check to see if this is a delayed execution thingajobber
+            if fieldname in self._defer_eval[0]:
+                self._generate_deferred(fieldname, parser, obj, packed)
+                # Inject any needed padding.
+                parser._pack_padding(pack_into=packed)
+            # If not delayed, add any dependent deferred evals to the todo list
+            else:
+                call_after_parse = self._defer_eval[1][fieldname]
+                # Only do this when not deferred.
+                parser.pack(obj=this_obj, pack_into=packed)
                 
-            except:
-                # Reset the position and len so that future parses don't break
-                parser.length = oldlen
-                parser.offset = 0
-                raise
+            # Advance the seeker BEFORE the finally block resets the length
+            # But first make sure we haven't already done it
+            if not seeker_advance:
+                seeker_advance += parser.length or 0
+            # We do, in fact, already have a seeker_advance, but it may
+            # not be current. 
+            else:
+                # Check if we have a better value (not None). Update if so.
+                if parser.length != None:
+                    seeker_advance = parser.length
+            # Advance the seeker before deferred calls in case they error.
+            seeker += seeker_advance
+            
+            # And perform any scheduled deferred calls
+            # IT IS VERY IMPORTANT TO NOTE THAT THIS HAPPENS BEFORE
+            # RESTORING THE LENGTH AND OFFSET FROM THE ORIGINAL PARSER.
+            for deferred in call_after_parse:
+                deferred()
+                
+            # Reset the parser's offset
+            parser.offset = 0
         
         # Finally, call the post-pack callback and return.
         packed = self._callback_postpack(packed)
@@ -942,51 +934,44 @@ class SmartyParser(_ParsableBase):
         # Don't use items, so that we can modify the parsehelpers themselves
         for fieldname in self._control:
             parser = self._control[fieldname]
-            # Try/finally: must be sure to reset slice offset to stay atomic-ish
-            try:
-                # Save length to restore later
-                oldlen = parser.length
-                # Don't forget this comes after the state save
-                parser.offset = seeker
-                # Redundant with pack, but not triply so. Oh well.
-                parser._infer_length()
+            
+            # Save length to restore later
+            oldlen = parser.length
+            # Don't forget this comes after the state save
+            parser.offset = seeker
+            # Redundant with pack, but not triply so. Oh well.
+            parser._infer_length()
+            
+            # Previously, this is where we did this:
+            # -----
+            # # Check length to add
+            # seeker_advance = parser.length
+            # -----
+            # But, since we've removed the callback to clear the 
+            # length of any lengthlinked data field after loading,
+            # we can now move it after. Also, this was causing bugs.
                 
-                # Previously, this is where we did this:
-                # -----
-                # # Check length to add
-                # seeker_advance = parser.length
-                # -----
-                # But, since we've removed the callback to clear the 
-                # length of any lengthlinked data field after loading,
-                # we can now move it after. Also, this was causing bugs.
-                    
-                # Aight we're good to go, but only return stuff that matters
-                obj = parser.unpack(data)
-                if fieldname not in self._exclude_from_obj:
-                    unpacked[fieldname] = obj
-                    
-                # print('seeker   ', seeker)
-                # print('newlen   ', parser.length)
-                # print('slice    ', parser.slice)
-                # print('data     ', bytes(data[parser.slice]))
-                # print('-----------------------------------------------')
-                    
-                # Check length to add
-                seeker_advance = parser.length
+            # Aight we're good to go, but only return stuff that matters
+            obj = parser.unpack(data)
+            if fieldname not in self._exclude_from_obj:
+                unpacked[fieldname] = obj
                 
-                # If we got this far, we should advance the seeker accordingly.
-                # Use sliced instead of length in case postunpack callbacks 
-                # got rid of it.
-                seeker += seeker_advance
+            # print('seeker   ', seeker)
+            # print('newlen   ', parser.length)
+            # print('slice    ', parser.slice)
+            # print('data     ', bytes(data[parser.slice]))
+            # print('-----------------------------------------------')
                 
-                # Finally, reset the parser offset.
-                parser.offset = 0
-                
-            except:
-                # Reset the position and len so that future parses don't break
-                parser.length = oldlen
-                parser.offset = 0
-                raise
+            # Check length to add
+            seeker_advance = parser.length
+            
+            # If we got this far, we should advance the seeker accordingly.
+            # Use sliced instead of length in case postunpack callbacks 
+            # got rid of it.
+            seeker += seeker_advance
+            
+            # Finally, reset the parser offset.
+            parser.offset = 0
                 
             # Infer lengths and then check them
             self.length = seeker - self.offset
