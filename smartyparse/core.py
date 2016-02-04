@@ -275,7 +275,7 @@ class _ParsableBase(metaclass=abc.ABCMeta):
         for call_on, func_def in callbacks.items():
             self.register_callback(call_on=call_on, *func_def)
         
-    def _infer_length(self, data=None):
+    def _infer_length(self, data_length=None):
         ''' Attempts to infer length from the parser, or, barring that,
         from the data itself.
         
@@ -286,10 +286,7 @@ class _ParsableBase(metaclass=abc.ABCMeta):
         '''
         self_expectation = self.length
         parser_expectation = self.parser.length
-        if data != None:
-            data_expectation = len(data)
-        else:
-            data_expectation = None
+        data_expectation = data_length
             
         # Oo, this is going to be clever.
         # If consistent lengthsc prefer parser -> parsehelper -> data
@@ -579,7 +576,7 @@ class ParseHelper(_ParsableBase):
         data = self._callback_postpack(data)
             
         # Now infer/check length and pack it into the object
-        self._infer_length(data)
+        self._infer_length(len(data))
         pack_into[self.slice] = data
         
         # And for consistency, return the packed object
