@@ -35,7 +35,7 @@ Smartyparse has no external dependencies at this time (beyond the standard libra
     
 # Example usage
 
-See [/doc](https://github.com/Muterra/py_smartyparse) for full API documentation.
+See [/doc](https://github.com/Muterra/py_smartyparse/doc) for full API documentation.
 
 **Declaring a simple length -> data object:**
 
