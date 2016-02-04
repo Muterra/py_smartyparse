@@ -1,16 +1,26 @@
-# Smartyparse
-
-Smartyparse is an intelligent general-purpose binary parsing, marshalling, serializing, etc library. Capable of dynamic operations, self-describing formats, nested formats, etc. Use it to encode, decode, and develop binary formats quickly and easily. It supports ```python>=3.3```.
-
-Smartyparse is under development as part of the [Muse protocol](https://github.com/Muterra/doc-muse) implementation used in the [Ethyr](https://www.ethyr.net) encrypted email-like messaging application. **If you would like to support Smartyparse, Muse, or Ethyr, please consider contributing to our [IndieGoGo campaign](https://www.indiegogo.com/projects/ethyr-modern-encrypted-email).**
+# SmartyParse
 
 [![Code Climate](https://codeclimate.com/github/Muterra/py_smartyparse/badges/gpa.svg)](https://codeclimate.com/github/Muterra/py_smartyparse)
 [![Issue Count](https://codeclimate.com/github/Muterra/py_smartyparse/badges/issue_count.svg)](https://codeclimate.com/github/Muterra/py_smartyparse)
 [![Build Status](https://travis-ci.org/Muterra/py_smartyparse.svg?branch=master)](https://travis-ci.org/Muterra/py_smartyparse)
 
+### What is SmartyParse?
+
+SmartyParse is a binary packing/unpacking (aka building/parsing) library for arbitrary formats written for ```python >= 3.3```. If you have a defined binary format (.tar, .bmp, byte-oriented network packets, etc) or are developing one, SmartyParse is a way to convert those formats to and from Python objects. Its most direct alternative is [Construct](https://construct.readthedocs.org/en/latest/intro.html), which is admittedly much more mature.
+
 **As an explicit warning,** this is a very, very new library, and you are likely to run into some bugs. Pull requests are welcome, and I apologize for the sometimes messy source.
 
--------------
+### What makes SmartyParse different?
+
+SmartyParse, first and foremost, was built to support self-describing formats. Though it's certainly possible to create these in declarative parsing libraries like Construct, it is very tedious, and requires a substantial amount of extra code.
+
+Fundamentally that means there are three big differences between SmartyParse and Construct:
+
+1. SmartyParse is highly Pythonic and very intuitive. Construct requires learning a specialized Construct descriptive format.
+2. SmartyParse is imperative. Construct is declarative.
+3. SmartyParse supports running arbitrary callbacks *during* the parsing process.
+
+Otherwise, Construct and SmartyParse are functionally similar (though for the record, SmartyParse doesn't yet natively support bit-oriented formats, which Construct does).
 
 # Installation
 
@@ -90,16 +100,25 @@ test_obj = {
 True
 ```
 
+# Supporting SmartyParse
+
+Smartyparse is under development as part of the [Muse protocol](https://github.com/Muterra/doc-muse) implementation used in the [Ethyr](https://www.ethyr.net) encrypted email-like messaging application. **If you would like to support Smartyparse, Muse, or Ethyr, please consider contributing to our [IndieGoGo campaign](https://www.indiegogo.com/projects/ethyr-modern-encrypted-email).**
+
 # Todo
 
 (In no particular order)
 
 + Change SmartyParserObject to use slots for storage, but not for item names (essentially removing attribute-style access, which isn't documented anyways)
++ Add self-describing format to example usage
 + Write .bmp library showcase
+    + https://github.com/construct/construct/blob/master/construct/formats/graphics/bmp.py
+    + https://en.wikipedia.org/wiki/BMP_file_format
+    + http://www.dragonwins.com/domains/getteched/bmp/bmpfileformat.htm
 + Move/mirror documentation to readthedocs
 + Add padding generation method (in addition to constant byte)
 + Add pip version badge: ```[![PyPi version](https://pypip.in/v/$REPO/badge.png)](https://github.com/Muterra/py_smartyparse)``` above.
 + Support bit orientation
++ Clean up callback API
 + Support endianness of binary blobs (aka transforming from little to big)
 + Support memoization of static SmartyParsers for extremely performant parsing
 + Support memoization of partially-static smartyparsers for better-than-completely-dynamic parsing
