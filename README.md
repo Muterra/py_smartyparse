@@ -12,7 +12,7 @@ SmartyParse is a binary packing/unpacking (aka building/parsing) library for arb
 
 ### What makes SmartyParse different?
 
-SmartyParse, first and foremost, was built to support self-describing formats. Though it's certainly possible to create these in declarative parsing libraries like Construct, it is very tedious, and requires a substantial amount of extra code.
+SmartyParse, first and foremost, was built to support self-describing formats. Though it is (to an extent) possible to create these in declarative parsing libraries like Construct, it is very tedious, and requires a substantial amount of extra code.
 
 Fundamentally that means there are three big differences between SmartyParse and Construct:
 
