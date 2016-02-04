@@ -241,5 +241,29 @@ if __name__ == '__main__':
     print(recycle3)
     print('-----------------------------------------------')
     
+    
+    
+    a = SmartyParser()
+    a['switch'] = ParseHelper(Int8(signed=False))
+    a['toggle'] = None
+    
+    def ex(enum):
+        if enum == 1:
+            a['toggle'] = ParseHelper(Int8())
+        else:
+            a['toggle'] = ParseHelper(Blob(length=1))
+            
+    a['switch'].register_callback('prepack', ex)
+    a['switch'].register_callback('postunpack', ex)
+            
+    a1 = {'switch': 1, 'toggle': -55}
+    a2 = {'switch': 0, 'toggle': b'H'}
+    
+    a11 = a.pack(a1)
+    a22 = a.pack(a2)
+    
+    assert a.unpack(a11) == a1
+    assert a.unpack(a22) == a2
+    
     import IPython
     IPython.embed()

@@ -80,13 +80,15 @@ class _CallHelper():
         just that it is correctly formatted for use as a callback.
         '''
         # Use None as a "DNE"
-        if func != None:
-            if not callable(func):
-                raise TypeError('Callbacks must be callable.')
-            func_info = inspect.getargspec(func)
-            required_argcount = len(func_info.args) - len(func_info.defaults)
-            if required_argcount != 1:
-                raise ValueError('Callbacks must take exactly one non-default argument.')
+        if func != None and not callable(func):
+            raise TypeError('Callbacks must be callable.')
+        # if func != None:
+        #     if not callable(func):
+        #         raise TypeError('Callbacks must be callable.')
+            # func_info = inspect.getargspec(func)
+            # required_argcount = len(func_info.args) - len(func_info.defaults)
+            # if required_argcount != 1:
+            #     raise ValueError('Callbacks must take exactly one non-default argument.')
             
         # Okay, should be good to go
         self._func = func
@@ -282,36 +284,38 @@ class _ParsableBase(metaclass=abc.ABCMeta):
         
         If self._length is defined, will return that instead.
         '''
-        # Figure out what expects what
         self_expectation = self.length
         parser_expectation = self.parser.length
-        try:
+        if data != None:
             data_expectation = len(data)
-        except TypeError:
-            data_expectation = None
-        
-        # Check for consistency and decide on outputs
-        if self_expectation != None and \
-            parser_expectation != None and \
-            self_expectation != parser_expectation:
-                raise RuntimeError('Parsehelper length expectation differs '
-                                    'from parser expectation.')
-        elif self_expectation != None and \
-            data_expectation != None and \
-            self_expectation != data_expectation:
-                raise RuntimeError('Parsehelper length expectation differs '
-                                    'from data length.')
-        elif data_expectation != None and \
-            parser_expectation != None and \
-            data_expectation != parser_expectation:
-                raise RuntimeError('Parser length expectation differs '
-                                    'from data length.')
-        # Consistent lengths. Prefer parsehelper -> parser -> data
         else:
-            result = self_expectation or parser_expectation or data_expectation
+            data_expectation = None
+            
+        # Oo, this is going to be clever.
+        # If consistent lengthsc prefer parser -> parsehelper -> data
+        if parser_expectation != None:
+            inferred = parser_expectation
+        elif self_expectation != None:
+            inferred = self_expectation
+        elif data_expectation != None:
+            inferred = data_expectation
+        else:
+            inferred = None
+            
+        # Now compare the inferred value to existing ones to establish
+        # consistency. Don't need to check parser_expectation -- if defined,
+        # it MUST be consistent, as per the control flow above.
+        if self_expectation != None and self_expectation != inferred:
+            raise RuntimeError('Incorrect expectations while '
+                                'inferring length. Did you try to assign '
+                                'a different length to a fixed-length parser?')
+        if data_expectation != None and data_expectation != inferred:
+            raise RuntimeError('Expectation/reality misalignment while '
+                                'inferring length. Data length does not match '
+                                'inferred length.')
             
         # And finally, update our length
-        self.length = result
+        self.length = inferred
         
     @property
     def length(self):
@@ -465,8 +469,30 @@ class _ParsableBase(metaclass=abc.ABCMeta):
 
 
 # ###############################################
-# SmartyParsers and ParseHelper
+# Objects exposed in public API
 # ###############################################
+
+
+class StaticParser():
+    ''' A static, deterministic parser. Can be generated from a 
+    SmartyParser if (and only if) the SmartyParser is totally static --
+    that is to say, StaticParsers cannot mutate themselves during
+    the packing/unpacking process. They therefore cannot support, for 
+    example, the common (blob_length, blob) combination.
+    '''
+    def __init__(self):
+        self.slices = []
+        self.parsers = []
+        self.parse_order = []
+        
+        # Basically, don't forget that delayed calls need to be supported, and
+        # callbacks, where possible, should still be incorporated.
+        
+        # This is going to require a massive rewrite on SmartyParser if it's to
+        # be capable of automatic discovery of freeze-capable formats.
+        
+        # Could implement parse_order as a generator that pulls the parsers and
+        # slices; that seems like it would be smart, IF if could be done well.
 
 
 class ParseHelper(_ParsableBase):
@@ -808,7 +834,9 @@ class SmartyParser(_ParsableBase):
         # Modification vs non-modification is handled by the CallHelper
         obj = self._callback_prepack(obj)
         
-        for fieldname, parser in self._control.items():
+        # Don't use items, so that we can modify the parsehelpers themselves
+        for fieldname in self._control:
+            parser = self._control[fieldname]
             this_obj = obj[fieldname]
             call_after_parse = []
             padding = b''
@@ -914,7 +942,9 @@ class SmartyParser(_ParsableBase):
         # Use this to control the "cursor" position
         seeker = self.offset
         
-        for fieldname, parser in self._control.items():
+        # Don't use items, so that we can modify the parsehelpers themselves
+        for fieldname in self._control:
+            parser = self._control[fieldname]
             # Try/finally: must be sure to reset slice offset to stay atomic-ish
             try:
                 # Save length to restore later

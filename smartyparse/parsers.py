@@ -88,7 +88,16 @@ class Blob(ParserBase):
     memoryview, and a memoryview from bytes.
     '''    
     def __init__(self, length=None):
-        self._length = None
+        # Try a numeric comparison to evaluate typing on length
+        if length != None:
+            try:
+                if int(length) != length:
+                    raise TypeError('Length must be int-like.')
+                if length < 0:
+                    raise ValueError('Length must be positive.')
+            except:
+                raise TypeError('Length must be int-like.')
+        self._length = length
         
     @property
     def length(self):

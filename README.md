@@ -108,6 +108,8 @@ Smartyparse is under development as part of the [Muse protocol](https://github.c
 
 (In no particular order)
 
++ Add passing of parent SmartyParser to callback system
++ Clean up callback API
 + Change SmartyParserObject to use slots for storage, but not for item names (essentially removing attribute-style access, which isn't documented anyways)
 + Add self-describing format to example usage
 + Write .bmp library showcase
@@ -118,7 +120,6 @@ Smartyparse is under development as part of the [Muse protocol](https://github.c
 + Add padding generation method (in addition to constant byte)
 + Add pip version badge: ```[![PyPi version](https://pypip.in/v/$REPO/badge.png)](https://github.com/Muterra/py_smartyparse)``` above.
 + Support bit orientation
-+ Clean up callback API
 + Support endianness of binary blobs (aka transforming from little to big)
 + Support memoization of static SmartyParsers for extremely performant parsing
 + Support memoization of partially-static smartyparsers for better-than-completely-dynamic parsing
