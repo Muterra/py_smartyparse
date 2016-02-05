@@ -108,8 +108,6 @@ Smartyparse is under development as part of the [Muse protocol](https://github.c
 
 (In no particular order)
 
-+ Add passing of parent SmartyParser to callback system
-+ Clean up callback API
 + Change SmartyParserObject to use slots for storage, but not for item names (essentially removing attribute-style access, which isn't documented anyways)
 + Add self-describing format to example usage
 + Write .bmp library showcase
@@ -128,6 +126,11 @@ Smartyparse is under development as part of the [Muse protocol](https://github.c
 + Performance testing
 + Add customized [pep8](http://pep8.readthedocs.org/en/latest/) to [codeclimate testing](https://docs.codeclimate.com/v1.0/docs/pep8), as per (as yet unpublished) Muterra code style guide
 + Support for "end flags" for indeterminate-length lists
+
+### Done!
+
++ ~~Add passing of parent SmartyParser to callback system.~~ Added in 0.1a4 with the ```@references(referent)``` decorator.
++ ~~Clean up callback API.~~ Added in 0.1a4
 
 # Misc API notes
 

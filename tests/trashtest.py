@@ -40,6 +40,7 @@ import copy
 from smartyparse import SmartyParser
 from smartyparse import ParseHelper
 from smartyparse import parsers
+from smartyparse import references
     
 from smartyparse.parsers import Blob
 from smartyparse.parsers import Int8
@@ -241,29 +242,25 @@ if __name__ == '__main__':
     print(recycle3)
     print('-----------------------------------------------')
     
+    parent = SmartyParser()
+    parent['switch'] = ParseHelper(Int8(signed=False))
+    parent['light'] = None
     
-    
-    a = SmartyParser()
-    a['switch'] = ParseHelper(Int8(signed=False))
-    a['toggle'] = None
-    
-    def ex(enum):
-        if enum == 1:
-            a['toggle'] = ParseHelper(Int8())
+    @references(parent)
+    def decide(self, switch):
+        if switch == 1:
+            self['light'] = ParseHelper(Int8())
         else:
-            a['toggle'] = ParseHelper(Blob(length=1))
+            self['light'] = ParseHelper(Blob(length=11))
             
-    a['switch'].register_callback('prepack', ex)
-    a['switch'].register_callback('postunpack', ex)
+    parent['switch'].register_callback('prepack', decide)
+    parent['switch'].register_callback('postunpack', decide)
             
-    a1 = {'switch': 1, 'toggle': -55}
-    a2 = {'switch': 0, 'toggle': b'H'}
+    off = {'switch': 1, 'light': -55}
+    on = {'switch': 0, 'light': b'Hello world'}
     
-    a11 = a.pack(a1)
-    a22 = a.pack(a2)
-    
-    assert a.unpack(a11) == a1
-    assert a.unpack(a22) == a2
+    parent.pack(off)
+    parent.pack(on)
     
     import IPython
     IPython.embed()

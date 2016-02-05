@@ -5,6 +5,10 @@ SmartyParse provides two public parsing objects:
 + ```ParseHelper```
 + ```SmartyParser```
 
+one convenience decorator for callback creation:
+
++ ```@references()```
+
 as well as several parsing primitives:
 
 + Binary blobs (```parsers.Blob```)
@@ -51,18 +55,18 @@ You can also use ParseHelpers to register callbacks to call immediately before a
 
 ```python
 {
-    'prepack': (callable func, bool modify),
-    'postpack': (callable func, bool modify),
-    'preunpack': (callable func, bool modify),
-    'postunpack': (callable func, bool modify)
+    'prepack': callable func,
+    'postpack': callable func,
+    'preunpack': callable func,
+    'postunpack': callable func
 }
 ```
 
-There may be as many or as few callbacks in the arg as you would like to declare.
+There may be as many or as few callbacks in the arg as you would like to declare. See callbacks below for more information.
 
 ### ```ParseHelper().parser```
 
-Read/write attribute. An instance of an object that complies with the ```parsers.ParserBase``` abstract base class. It is used for the actual conversion between binary bytes and python objects. In theory it can be modified, even during the parsing process (enabling self-describing files), but this is untested water.
+Read/write attribute. An instance of an object that complies with the ```parsers.ParserBase``` abstract base class. It is used for the actual conversion between binary bytes and python objects. In theory it can be modified, even during the parsing process, but this is untested water.
 
 ### ```ParseHelper().offset```
 
@@ -82,11 +86,18 @@ Read-only attribute. The ```slice``` object for segmenting the file. In the seco
 
 ### ```ParseHelper().callbacks```
 
-Read-only attribute. A quick-reference description of all declared callbacks.
+Read-only attribute. A quick-reference description of all declared callbacks. Returns a dictionary with the following format:
 
-### ```ParseHelper().CALLBACK_FORMAT```
+```python
+{
+    'postpack': _SmartyparseCallback(func=None, modify=False),
+    'postunpack': _SmartyparseCallback(func=None, modify=False),
+    'prepack': _SmartyparseCallback(func=None, modify=False),
+    'preunpack': _SmartyparseCallback(func=None, modify=False)
+}
+```
 
-A ```collections.namedtuple``` class describing the callback format to be used when declaring callbacks in arguments to the ParseHelper constructor, or as attributes to a ParseHelper object. Provided purely for reference.
+See the section on callback attributes below for more information regarding ```_SmartyparseCallback```s.
 
 ### ```ParseHelper().callback_preunpack```
 ### ```ParseHelper().callback_postunpack```
@@ -100,9 +111,51 @@ Read/write attributes. Sets the respective callback. Callbacks are called immedi
 + prepack is passed the python object to pack
 + postpack is passed the bytes corresponding to the field being parsed
 
-To set callbacks by attribute, pass a tuple of (callable func, bool modify). Callbacks may optionally modify the object/bytes they're operating on by setting ```modify=True```. Otherwise, the callback will be called *on* the object, while ignoring any return.
+To set callbacks by attribute, simply set them equal to a callable object:
 
-Callbacks may be removed with the ```del``` keyword.
+```ParseHelper().callback_prepack = func```
+
+By default, these callables *will not* modify the object/data being built/parsed. Instead, the callback will be executed, and the original result of the building/parsing will be returned via ```build()```/```pack()```, ignoring the output of the callback:
+
+```
+callback_prepack(unpacked_object)
+packed_bytes = pack(unpacked_object)
+callback_postpack(packed_bytes)
+return packed_bytes
+```
+
+If you would like the output of the callback to *replace* that value, like this:
+
+```
+modified_unpacked_object = callback_prepack(unpacked_object)
+packed_bytes = pack(modified_unpacked_object)
+modified_packed_bytes = callback_postpack(packed_bytes)
+return modified_packed_bytes
+```
+then set the modify attribute of the respective callbacks to True:
+
+```python
+ParseHelper().callback_prepack.modify = True
+ParseHelper().callback_postpack.modify = True
+```
+
+These can, of course, be mixed-and-matched on a per-callback basis.
+
+Callbacks may be removed with the ```del``` keyword. This removes any callback function, and sets ```modify = False```.
+
+##### ```_SmartyparseCallback``` objects
+
+When registering a callable as a callback, smartyparse does not directly assign the function to the callback_???pack attribute. Instead, it wraps the function within a callable class, adding some helper functions in the process, including the management of modifying/not modifying input. The original callable is available at ```_SmartyparseCallback().func```. 
+
+A ```_SmartyparseCallback``` object is always callable, and it will always respect its modify attribute, *even if its function is ```None```*. In that case, the callable is quite simply: 
+
+```python
+lambda *args, **kwargs: None
+```
+
+and calling such an object with ```modify=True``` will **always** result in a return of None, completely ignoring any passed arguments.
+
+**Note that _SmartyparseCallbacks are a non-public API subject to change at any time.** You're welcome to use them, but don't complain if future updates break compatibility with no warning!
 
 ### ```ParseHelper().register_callback(call_on, func, modify=False)```
 
@@ -238,6 +291,44 @@ packable_obj = {
     }
     
 packed = lengthlinked.pack(packable_obj)
+```
+
+# @references()
+
+When creating callbacks, it's often desirable that they behave like methods in the parent object. For example, if you're trying to create a self-describing format, it's very useful for callbacks on ```ParseHelper```s to have access to their containing ```SmartyParser```s, thereby allowing the parsers to easily mutate the parent. This mechanism is extremely powerful; it is also a little awkward to define on its own.
+
+To facilitate this process, smartyparse includes a convenience decorator, ```@references(obj)```. It will automatically inject ```obj``` as the first argument to the function. Here is a simple example of its use:
+
+```python
+from smartyparse import SmartyParser
+from smartyparse import ParseHelper
+from smartyparse import references
+from smartyparse.parsers import Int8
+from smartyparse.parsers import Blob
+
+parent = SmartyParser()
+parent['switch'] = ParseHelper(Int8(signed=False))
+parent['light'] = None
+
+@references(parent)
+def decide(self, switch):
+    if switch == 1:
+        self['light'] = ParseHelper(Int8())
+    else:
+        self['light'] = ParseHelper(Blob(length=11))
+        
+parent['switch'].register_callback('prepack', decide)
+parent['switch'].register_callback('postunpack', decide)
+        
+off = {'switch': 1, 'light': -55}
+on = {'switch': 0, 'light': b'Hello world'}
+```
+
+```python
+>>> parent.pack(off)
+bytearray(b'\x01\xc9')
+>>> parent.pack(on)
+bytearray(b'\x00Hello world')
 ```
 
 # Parsers

@@ -31,12 +31,13 @@ Smartyparse: A python library for smart dynamic binary de/encoding.
 
 '''
 
-__all__ = ['ParseHelper', 'SmartyParser']
+__all__ = ['ParseHelper', 'SmartyParser', 'references']
 
 # Global dependencies
 import abc
 import collections
 import inspect
+import functools
 
 # Interpackage dependencies
 from . import parsers
@@ -46,9 +47,11 @@ from . import parsers
 # ###############################################
 
 
-class _CallHelper():
+class _SmartyparseCallback():
     ''' Clever callable class wrapper for callbacks in ParseHelper.
     '''
+    NOOP = lambda *args, **kwargs: None
+    
     def __init__(self, func, modify=False):
         self.func = func
         self.modify = modify
@@ -59,9 +62,7 @@ class _CallHelper():
         
         If modify is false, we'll return the original argument.
         '''
-        if self.func == None:
-            result = arg
-        elif self.modify:
+        if self.modify:
             result = self.func(arg)
         else:
             # Discard the function's return
@@ -80,24 +81,40 @@ class _CallHelper():
         just that it is correctly formatted for use as a callback.
         '''
         # Use None as a "DNE"
-        if func != None and not callable(func):
+        if func == None:
+            func = self.NOOP
+        elif not callable(func):
             raise TypeError('Callbacks must be callable.')
-        # if func != None:
-        #     if not callable(func):
-        #         raise TypeError('Callbacks must be callable.')
-            # func_info = inspect.getargspec(func)
-            # required_argcount = len(func_info.args) - len(func_info.defaults)
-            # if required_argcount != 1:
-            #     raise ValueError('Callbacks must take exactly one non-default argument.')
             
         # Okay, should be good to go
         self._func = func
         
+    @func.deleter
+    def func(self):
+        self._func = self.NOOP
+        
     def __repr__(self):
         ''' Some limited handling of subclasses is included.
         '''
+        if self.func == self.NOOP:
+            func = None
+        else:
+            func = self.func
+        
         c = type(self).__name__
-        return c + '(func=' + repr(self.func) + ', modify=' + repr(self.modify) + ')'
+        # Note that calling repr instead of str will result in infinite
+        # recursion, because the function needs the repr(self) for contextual
+        # clues in its repr.
+        return c + '(func=' + repr(func) + ', modify=' + repr(self.modify) + ')'
+        
+    def __str__(self):
+        if self.func is self.NOOP:
+            func = None
+        else:
+            func = self.func
+            
+        s = str(func) + ': modify=' + str(self.modify)
+        return s
         
 
 class _SPOMeta(type):
@@ -243,12 +260,6 @@ class _ParsableBase(metaclass=abc.ABCMeta):
     ''' Base class for anything parsable. Subclassed by both ParseHelper
     and SmartyParser.
     '''
-    
-    CALLBACK_FORMAT = collections.namedtuple(
-            typename = 'ParseCallbackDeclaration',
-            field_names = ['func', 'modify']
-        )
-    
     def __init__(self, offset=0, callbacks=None):
         ''' NOTE THE ORDER OF CALLBACK EXECUTION!
         preunpack calls on data (bytes)
@@ -265,10 +276,12 @@ class _ParsableBase(metaclass=abc.ABCMeta):
         self._slice = None
         self.offset = offset
         
-        self.register_callback('prepack', None)
-        self.register_callback('preunpack', None)
-        self.register_callback('postpack', None)
-        self.register_callback('postunpack', None)
+        # Initialize these manually so that subsequent assigns don't reference
+        # ex. self.callback_prepack.modify before assignment
+        self._callback_prepack = _SmartyparseCallback(None)
+        self._callback_postpack = _SmartyparseCallback(None)
+        self._callback_preunpack = _SmartyparseCallback(None)
+        self._callback_postunpack = _SmartyparseCallback(None)
         
         callbacks = callbacks or {}
         
@@ -351,14 +364,14 @@ class _ParsableBase(metaclass=abc.ABCMeta):
         
     def _build_slice(self, pack_into=None, open_ended=False):
         start = self.offset
-        length = self.length or 0
+        length = self.length
         
         # Catch lengths of none as zero, and if slice will be
         # out-of-bounds on pack_into, slice open-ended
-        if open_ended or \
-            self.length == None or \
-            pack_into != None and len(pack_into) < length + start:
-                stop = None
+        if open_ended or length == None:
+            stop = None
+        elif pack_into != None and len(pack_into) < length + start:
+            stop = None
         else:
             stop = start + length
             
@@ -366,13 +379,17 @@ class _ParsableBase(metaclass=abc.ABCMeta):
         
     def register_callback(self, call_on, func, modify=False):
         if call_on == 'preunpack':
-            self.callback_preunpack = (func, modify)
+            self.callback_preunpack = func
+            self.callback_preunpack.modify = modify
         elif call_on == 'postunpack':
-            self.callback_postunpack = (func, modify)
+            self.callback_postunpack = func
+            self.callback_postunpack.modify = modify
         elif call_on == 'prepack':
-            self.callback_prepack = (func, modify)
+            self.callback_prepack = func
+            self.callback_prepack.modify = modify
         elif call_on == 'postpack':
-            self.callback_postpack = (func, modify)
+            self.callback_postpack = func
+            self.callback_postpack.modify = modify
         else:
             raise ValueError('call_on must be either "preunpack", "postunpack", '
                              '"prepack", or "postpack".')
@@ -388,59 +405,59 @@ class _ParsableBase(metaclass=abc.ABCMeta):
         
     @property
     def callback_preunpack(self):
-        return self.CALLBACK_FORMAT(
-            self._callback_preunpack.func, 
-            self._callback_preunpack.modify)
+        return self._callback_preunpack
         
     @callback_preunpack.setter
-    def callback_preunpack(self, value):
-        self._callback_preunpack = _CallHelper(*value)
+    def callback_preunpack(self, func):
+        # Preserve current state of modify
+        modify = self._callback_preunpack.modify
+        self._callback_preunpack = _SmartyparseCallback(func, modify=modify)
         
     @callback_preunpack.deleter
     def callback_preunpack(self):
-        self._callback_preunpack = _CallHelper(None)
+        self._callback_preunpack = _SmartyparseCallback(None)
         
     @property
     def callback_postunpack(self):
-        return self.CALLBACK_FORMAT(
-            self._callback_postunpack.func, 
-            self._callback_postunpack.modify)
+        return self._callback_postunpack
         
     @callback_postunpack.setter
-    def callback_postunpack(self, value):
-        self._callback_postunpack = _CallHelper(*value)
+    def callback_postunpack(self, func):
+        # Preserve current state of modify
+        modify = self._callback_postunpack.modify
+        self._callback_postunpack = _SmartyparseCallback(func, modify=modify)
         
     @callback_postunpack.deleter
     def callback_postunpack(self):
-        self._callback_postunpack = _CallHelper(None)
+        self._callback_postunpack = _SmartyparseCallback(None)
         
     @property
     def callback_prepack(self):
-        return self.CALLBACK_FORMAT(
-            self._callback_prepack.func, 
-            self._callback_prepack.modify)
+        return self._callback_prepack
         
     @callback_prepack.setter
-    def callback_prepack(self, value):
-        self._callback_prepack = _CallHelper(*value)
+    def callback_prepack(self, func):
+        # Preserve current state of modify
+        modify = self._callback_prepack.modify
+        self._callback_prepack = _SmartyparseCallback(func, modify=modify)
         
     @callback_prepack.deleter
     def callback_prepack(self):
-        self._callback_prepack = _CallHelper(None)
+        self._callback_prepack = _SmartyparseCallback(None)
         
     @property
     def callback_postpack(self):
-        return self.CALLBACK_FORMAT(
-            self._callback_postpack.func, 
-            self._callback_postpack.modify)
+        return self._callback_postpack
         
     @callback_postpack.setter
-    def callback_postpack(self, value):
-        self._callback_postpack = _CallHelper(*value)
+    def callback_postpack(self, func):
+        # Preserve current state of modify
+        modify = self._callback_postpack.modify
+        self._callback_postpack = _SmartyparseCallback(func, modify=modify)
         
     @callback_postpack.deleter
     def callback_postpack(self):
-        self._callback_postpack = _CallHelper(None)
+        self._callback_postpack = _SmartyparseCallback(None)
         
     @property
     @abc.abstractmethod
@@ -468,6 +485,15 @@ class _ParsableBase(metaclass=abc.ABCMeta):
 # ###############################################
 # Objects exposed in public API
 # ###############################################
+
+
+def references(referent):
+    def referent_wrapper(func):
+        @functools.wraps(func)
+        def injected(*args, **kwargs):
+            return func(referent, *args, **kwargs)
+        return injected
+    return referent_wrapper
 
 
 class StaticParser():
@@ -548,14 +574,14 @@ class ParseHelper(_ParsableBase):
         data = unpack_from[self.slice]
             
         # Pre-unpack calls on data
-        # Modification vs non-modification is handled by the CallHelper
+        # Modification vs non-modification is handled by the SmartyparseCallback
         data = self._callback_preunpack(data)
         
         # Parse data -> obj
         obj = self.parser.unpack(data)
         
         # Post-unpack calls on obj
-        # Modification vs non-modification is handled by the CallHelper
+        # Modification vs non-modification is handled by the SmartyparseCallback
         obj = self._callback_postunpack(obj)
         
         return obj
@@ -565,14 +591,14 @@ class ParseHelper(_ParsableBase):
         self._build_slice(pack_into=pack_into)
         
         # Pre-pack calls on obj
-        # Modification vs non-modification is handled by the CallHelper
+        # Modification vs non-modification is handled by the SmartyparseCallback
         obj = self._callback_prepack(obj)
         
         # Parse obj -> data
         data = self.parser.pack(obj)
         
         # Post-pack calls on data
-        # Modification vs non-modification is handled by the CallHelper
+        # Modification vs non-modification is handled by the SmartyparseCallback
         data = self._callback_postpack(data)
             
         # Now infer/check length and pack it into the object
@@ -828,7 +854,7 @@ class SmartyParser(_ParsableBase):
         seeker = 0
         
         # Pre-pack calls on obj
-        # Modification vs non-modification is handled by the CallHelper
+        # Modification vs non-modification is handled by the SmartyparseCallback
         obj = self._callback_prepack(obj)
         
         # Don't use items, so that we can modify the parsehelpers themselves
@@ -978,7 +1004,7 @@ class SmartyParser(_ParsableBase):
             self._infer_length()
             
         # Post-unpack calls on obj
-        # Modification vs non-modification is handled by the CallHelper
+        # Modification vs non-modification is handled by the SmartyparseCallback
         unpacked = self._callback_postunpack(unpacked)
         
         # Redundant if this wasn't newly created, but whatever
