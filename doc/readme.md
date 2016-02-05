@@ -205,7 +205,6 @@ Removing both of these constraints is on the to-do list.
 
 ### ```SmartyParser().offset```
 ### ```SmartyParser().length```
-### ```SmartyParser().CALLBACK_FORMAT```
 ### ```SmartyParser().slice```
 ### ```SmartyParser().callbacks```
 ### ```SmartyParser().callback_preunpack```
