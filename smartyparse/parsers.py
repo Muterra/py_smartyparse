@@ -41,6 +41,10 @@ import collections
 # ###############################################
 
 
+class ParseError(RuntimeError):
+    pass
+
+
 class ParserBase(metaclass=abc.ABCMeta):
     length = None
     
@@ -77,10 +81,16 @@ class _StructParserBase(ParserBase):
         return self._packer.size
     
     def unpack(self, data):
-        return self._packer.unpack(data)[0]
+        try:
+            return self._packer.unpack(data)[0]
+        except (TypeError, ValueError) as e:
+            raise ParseError('Failed to parse value.') from e
         
     def pack(self, obj):
-        return self._packer.pack(obj)
+        try:
+            return self._packer.pack(obj)
+        except (TypeError, ValueError) as e:
+            raise ParseError('Failed to parse value.') from e
         
 
 class Blob(ParserBase):
@@ -105,14 +115,14 @@ class Blob(ParserBase):
     
     def unpack(self, data):
         if self.length != None and len(data) != self.length:
-            raise ValueError('Data length does not match fixed-length blob parser.')
+            raise ParseError('Data length does not match fixed-length blob parser.')
         
         # Efficiently expose the data
         return memoryview(data)
         
     def pack(self, obj):
         if self.length != None and len(obj) != self.length:
-            raise ValueError('Data length does not match fixed-length blob parser.')
+            raise ParseError('Data length does not match fixed-length blob parser.')
         
         # Try to freeze the data
         if isinstance(obj, memoryview):
@@ -138,7 +148,7 @@ class Padding(ParserBase):
     
     def unpack(self, data):
         if len(data) != self.length:
-            raise ValueError('Data length does not match fixed-length padding parser.')
+            raise ParseError('Data length does not match fixed-length padding parser.')
         # Could check the padding is 'valid' if we'd like, but no need yet
         
         # Always return None
