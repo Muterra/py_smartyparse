@@ -702,7 +702,6 @@ class ListyParser(_ParsableBase):
     def _attempt_pack_single(self, obj, pack_into, seeker):
         # Iterates through available parsers and returns length to advance
         seeker_advance = 0
-        success = False
         
         # I should change this nomenclature to differentiate between 
         # parsables like ParseHelper and the actual parsers
@@ -712,7 +711,6 @@ class ListyParser(_ParsableBase):
             
             try:
                 parser.pack(obj=obj, pack_into=pack_into)
-                success = True
                 seeker_advance = parser.length or 0
                 break
             except ParseError:
@@ -720,10 +718,9 @@ class ListyParser(_ParsableBase):
             finally:
                 # This is, in fact, also executed when departing via break
                 parser.offset = 0
-            
-        # If it was successfully parsed, success=True, and the object is
-        # in packed. If it wasn't, success=False, and packed is unchanged.
-        if not success:
+        # This will only execute if break was not called, indicating no
+        # successful parser discovery.
+        else:
             raise ParseError('Could not find a valid parser for iterant.')
             
         return seeker_advance
@@ -789,13 +786,11 @@ class ListyParser(_ParsableBase):
         # parsables like ParseHelper and the actual parsers
         terminant = False
         for parser in self._unpack_try_order:
-            success = False
             parser.offset = seeker
             parser._infer_length()
             
             try:
                 obj = parser.unpack(unpack_from=unpack_from)
-                success = True
                 seeker_advance = parser.length or 0
                 break
             except ParseError:
@@ -803,10 +798,9 @@ class ListyParser(_ParsableBase):
             finally:
                 # This is, in fact, also executed when departing via break
                 parser.offset = 0
-            
-        # If it was successfully parsed, success=True, and the object is
-        # in packed. If it wasn't, success=False, and packed is unchanged.
-        if not success:
+        # This will only execute if break was not called, indicating no
+        # successful parser discovery.
+        else:
             raise ParseError('Could not find a valid parser for iterant.')
         
         # In this case, handle loading the object. Note that if we've broken, 
@@ -839,7 +833,8 @@ class ListyParser(_ParsableBase):
         
         # Repeat until we get a terminate signal or we're at the EOF
         terminate = False
-        while not terminate and (seeker < (self.slice.stop or len(unpack_from))):
+        endpoint = self.slice.stop or len(unpack_from)
+        while not terminate and seeker < endpoint:
             seeker_advance, terminate = self._attempt_unpack_single(data, unpacked, seeker)
             seeker += seeker_advance
                 
