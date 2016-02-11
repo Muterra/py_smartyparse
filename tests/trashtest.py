@@ -39,6 +39,7 @@ import copy
 
 from smartyparse import SmartyParser
 from smartyparse import ParseHelper
+from smartyparse import ListyParser
 from smartyparse import parsers
 from smartyparse import references
     
@@ -135,112 +136,112 @@ if __name__ == '__main__':
     
     print('-----------------------------------------------')
     print('Testing all "other" parsers...')
-    print('    ', tv4)
+    # print('    ', tv4)
     
     bites4 = tf_2.pack(tv4)
     
-    print('Successfully packed.')
-    print('    ', bytes(bites4))
+    # print('Successfully packed.')
+    # print('    ', bytes(bites4))
     
     recycle4 = tf_2.unpack(bites4)
+    # Note that numerical precision prevents us from easily:
+    # assert recycle4 == tv4
     
-    print('Successfully reunpacked.')
-    print(recycle4)
+    # print('Successfully reunpacked.')
+    # print(recycle4)
     
-    
-    print('    ', tv5)
+    # print('    ', tv5)
     
     bites5 = tf_nest2.pack(tv5)
     
-    print('Successfully packed.')
-    print('    ', bytes(bites5))
+    # print('Successfully packed.')
+    # print('    ', bytes(bites5))
     
     recycle5 = tf_nest2.unpack(bites5)
-    
+    assert recycle5 == tv5
     print('Successfully reunpacked.')
-    print(recycle5)
-    print('-----------------------------------------------')
+    
+    # print(recycle5)
+    # print('-----------------------------------------------')
     
     print('-----------------------------------------------')
     print('Starting TV1, serial...')
-    print('    ', tv1)
+    # print('    ', tv1)
     
     bites1 = tf_1.pack(tv1)
     
-    print('Successfully packed.')
-    print('    ', bytes(bites1))
+    # print('Successfully packed.')
+    # print('    ', bytes(bites1))
     
     recycle1 = tf_1.unpack(bites1)
-    
+    assert recycle1 == tv1
     print('Successfully reunpacked.')
-    print(recycle1)
-    print('-----------------------------------------------')
+    
+    # print(recycle1)
+    # print('-----------------------------------------------')
     
     print('-----------------------------------------------')
     print('Starting TV2, serial...')
-    print('    ', tv2)
+    # print('    ', tv2)
     
     bites2 = tf_1.pack(tv2)
     
-    print('Successfully packed.')
-    print('    ', bytes(bites2))
+    # print('Successfully packed.')
+    # print('    ', bytes(bites2))
     
     recycle2 = tf_1.unpack(bites2)
-    
+    assert recycle2 == tv2
     print('Successfully reunpacked.')
-    print(recycle2)
-    print('-----------------------------------------------')
+    
+    # print(recycle2)
+    # print('-----------------------------------------------')
     
     print('-----------------------------------------------')
-    print('Starting TV1, parallel...')
-    print('    ', tv1)
+    print('Starting TV1, TV2 parallel...')
+    # print('    ', tv1)
     
     bites1 = tf_1.pack(tv1)
     
-    print('Successfully packed TV1.')
-    print('    ', bytes(bites1))
+    # print('Successfully packed TV1.')
+    # print('    ', bytes(bites1))
     
-    print('-----------------------------------------------')
-    print('Starting TV2, parallel...')
-    print('    ', tv2)
+    # print('    ', tv2)
     
     bites2 = tf_1.pack(tv2)
     
-    print('Successfully packed TV2.')
-    print('    ', bytes(bites2))
-    print('-----------------------------------------------')
+    # print('Successfully packed TV2.')
+    # print('    ', bytes(bites2))
     
     recycle1 = tf_1.unpack(bites1)
-    
-    print('-----------------------------------------------')
+    assert recycle1 == tv1
     print('Successfully reunpacked TV1.')
-    print(recycle1)
+    
+    # print(recycle1)
     
     recycle2 = tf_1.unpack(bites2)
-    
-    print('-----------------------------------------------')
+    assert recycle2 == tv2
     print('Successfully reunpacked TV2.')
-    print(recycle2)
     
-    print('-----------------------------------------------')
+    # print(recycle2)
+    
     print('-----------------------------------------------')
     print('Starting (nested) TV3...')
-    print(tv3)
-    print('-----------------------------------------------')
+    # print(tv3)
     
     bites3 = tf_nest.pack(tv3)
     
-    print('-----------------------------------------------')
-    print('Successfully packed.')
-    print(bytes(bites3))
-    print('-----------------------------------------------')
+    # print('-----------------------------------------------')
+    # print('Successfully packed.')
+    # print(bytes(bites3))
+    # print('-----------------------------------------------')
     
     recycle3 = tf_nest.unpack(bites3)
-    
-    print('-----------------------------------------------')
+    assert recycle3 == tv3
     print('Successfully reunpacked.')
-    print(recycle3)
+    
+    # print(recycle3)
     print('-----------------------------------------------')
+    print('Testing toggle...')
     
     parent = SmartyParser()
     parent['switch'] = ParseHelper(Int8(signed=False))
@@ -259,14 +260,16 @@ if __name__ == '__main__':
     off = {'switch': 1, 'light': -55}
     on = {'switch': 0, 'light': b'Hello world'}
     
-    parent.pack(off)
-    parent.pack(on)
+    o1 = parent.pack(off)
+    o2 = parent.pack(on)
+    assert parent.unpack(o1) == off
+    assert parent.unpack(o2) == on
+    print('Success.')
     
     # -----------------------------------------------------------------
-    from smartyparse import ListyParser
-    from smartyparse import ParseHelper
-    from smartyparse.parsers import Int8
-    
+    print('-----------------------------------------------')
+    print('Testing listyparser...')
+        
     pastr = SmartyParser()    
     pastr['length'] = ParseHelper(parsers.Int8(signed=False))
     pastr['body'] = ParseHelper(parsers.String())
@@ -291,8 +294,18 @@ if __name__ == '__main__':
     tag_typed['tag'].register_callback('prepack', switch)
     tag_typed['tag'].register_callback('postunpack', switch)
     
-    aaa = ListyParser(parsers=[tag_typed])
-    bbb = aaa.pack([{'tag': 0, 'toggle': 5}, {'tag': 1, 'toggle': 51}, {'tag': 65, 'toggle': {'body': 'hello world'}}, {'tag': 2, 'toggle': 3453}])
+    tf_list = ListyParser(parsers=[tag_typed])
+    tv_list = [
+            {'tag': 0, 'toggle': 5}, 
+            {'tag': 1, 'toggle': 51}, 
+            {'tag': 65, 'toggle': {'body': 'hello world'}}, 
+            {'tag': 2, 'toggle': 3453}
+        ]
+    tv_list_pack = tf_list.pack(tv_list)
+    for it1, it2 in zip(tv_list, tf_list.unpack(tv_list_pack)):
+        assert it1 == it2
+    print('Success.')
+    # assert tf_list.unpack(tv_list_pack) == tv_list
     
     # Can do some kind of check for len of self.obj to determine if there's 
     # only a single entry in the smartyparser, and thereby expand any 

@@ -693,6 +693,35 @@ class ListyParser(_ParsableBase):
         # ListyParsers are their own parsers.
         return self
         
+    def _attempt_pack_single(self, obj, pack_into, seeker):
+        # Iterates through available parsers and returns length to advance
+        seeker_advance = 0
+        success = False
+        
+        # I should change this nomenclature to differentiate between 
+        # parsables like ParseHelper and the actual parsers
+        for parser in self.parsers:
+            parser.offset = seeker
+            parser._infer_length()
+            
+            try:
+                parser.pack(obj=obj, pack_into=pack_into)
+                success = True
+                seeker_advance = parser.length or 0
+                break
+            except ParseError:
+                pass
+            finally:
+                # This is, in fact, also executed when departing via break
+                parser.offset = 0
+            
+        # If it was successfully parsed, success=True, and the object is
+        # in packed. If it wasn't, success=False, and packed is unchanged.
+        if not success:
+            raise ParseError('Could not find a valid parser for iterant.')
+            
+        return seeker_advance
+        
     def pack(self, obj, pack_into=None):
         ''' Automatically assembles a message from an indefinite-length
         list. Objects to pack must be iterables and are returned as 
@@ -718,35 +747,10 @@ class ListyParser(_ParsableBase):
         # Modification vs non-modification is handled by the SmartyparseCallback
         obj = self._callback_prepack(obj)
         
-        # Control
+        # Parse each of the individual objects
         for this_obj in obj:
-            this_data = None
-            seeker_advance = 0
-            success = False
-            
-            # I should change this nomenclature to differentiate between 
-            # parsables like ParseHelper and the actual parsers
-            for parser in self.parsers:
-                parser.offset = seeker
-                parser._infer_length()
-                
-                try:
-                    parser.pack(obj=this_obj, pack_into=packed)
-                    success = True
-                    seeker_advance = parser.length or 0
-                    break
-                except ParseError:
-                    pass
-                finally:
-                    # This is, in fact, also executed when departing via break
-                    parser.offset = 0
-                
-            # If it was successfully parsed, success=True, and the object is
-            # in packed. If it wasn't, success=False, and packed is unchanged.
-            if not success:
-                raise ParseError('Could not find a valid parser for iterant.')
-                
             # Advance the seeker
+            seeker_advance = self._attempt_pack_single(this_obj, packed, seeker)
             seeker += seeker_advance
         
         # Now call the terminant on the packed data
@@ -772,6 +776,38 @@ class ListyParser(_ParsableBase):
         pack_into[self.slice] = bytes(packed)
         return pack_into
         
+    def _attempt_unpack_single(self, unpack_from, load_into, seeker):
+        # Tries all parsers for the given position, returning the advance
+        # and terminant=True/False if successful. Raise parseerror otherwise.
+        # I should change this nomenclature to differentiate between 
+        # parsables like ParseHelper and the actual parsers
+        for parser in self._unpack_try_order:
+            success = False
+            parser.offset = seeker
+            parser._infer_length()
+            
+            try:
+                obj = parser.unpack(unpack_from=unpack_from)
+                load_into.append(obj)
+                success = True
+                seeker_advance = parser.length or 0
+                break
+            except ParseError:
+                pass
+            finally:
+                # This is, in fact, also executed when departing via break
+                parser.offset = 0
+            
+        # If it was successfully parsed, success=True, and the object is
+        # in packed. If it wasn't, success=False, and packed is unchanged.
+        if not success:
+            raise ParseError('Could not find a valid parser for iterant.')
+            
+        # Return the offset.
+        # Also, what if parser was self.terminant? Note that if we've broken, 
+        # parser still holds the last state.
+        return seeker_advance, parser is self.terminant
+        
     def unpack(self, unpack_from):
         # Create output object and reframe as memoryview to avoid copies
         unpacked = []
@@ -791,50 +827,11 @@ class ListyParser(_ParsableBase):
         # Use this to control the "cursor" position
         seeker = self.offset
         
-        # Repeat until break
-        while True:
-            # this_data = None
-            
-            # I should change this nomenclature to differentiate between 
-            # parsables like ParseHelper and the actual parsers
-            for parser in self._unpack_try_order:
-                success = False
-                parser.offset = seeker
-                parser._infer_length()
-                
-                try:
-                    obj = parser.unpack(unpack_from=data)
-                    unpacked.append(obj)
-                    success = True
-                    seeker_advance = parser.length or 0
-                    break
-                except ParseError:
-                    pass
-                finally:
-                    # This is, in fact, also executed when departing via break
-                    parser.offset = 0
-                
-            # If it was successfully parsed, success=True, and the object is
-            # in packed. If it wasn't, success=False, and packed is unchanged.
-            if not success:
-                raise ParseError('Could not find a valid parser for iterant.')
-                
+        # Repeat until we get a terminate signal or we're at the EOF
+        terminate = False
+        while not terminate and seeker < len(unpack_from):
+            seeker_advance, terminate = self._attempt_unpack_single(data, unpacked, seeker)
             seeker += seeker_advance
-                
-            # What if parser was self.terminant? Note that if we've broken, 
-            # parser still holds the last state.
-            # Also, what if we're at the end of our rope?
-            if parser is self.terminant or seeker >= len(unpack_from):
-                break
-                
-            # # Infer lengths and then check them
-            # self.length = seeker - self.offset
-            # self._infer_length()
-            # print('seeker   ', seeker)
-            # print('newlen   ', parser.length)
-            # print('slice    ', parser.slice)
-            # print('data     ', bytes(data[parser.slice]))
-            # print('-----------------------------------------------')
                 
         # Finally, we need to callback and return, freezing to a tuple for 
         # performance reasons
@@ -1175,7 +1172,7 @@ class SmartyParser(_ParsableBase):
                 
             # Redundant with pack, but not triply so. Oh well.
             parser._infer_length()
-            seeker_advance = parser.length or 0
+            # seeker_advance = parser.length or 0
                 
             # Check to see if this is a delayed execution thingajobber
             if fieldname in self._defer_eval[0]:
@@ -1189,17 +1186,7 @@ class SmartyParser(_ParsableBase):
                 parser.pack(obj=this_obj, pack_into=packed)
                 
             # Advance the seeker BEFORE the finally block resets the length
-            # But first make sure we haven't already done it
-            if not seeker_advance:
-                seeker_advance += parser.length or 0
-            # We do, in fact, already have a seeker_advance, but it may
-            # not be current. 
-            else:
-                # Check if we have a better value (not None). Update if so.
-                if parser.length != None:
-                    seeker_advance = parser.length
-            # Advance the seeker before deferred calls in case they error.
-            seeker += seeker_advance
+            seeker += parser.length or 0
             
             # And perform any scheduled deferred calls
             # IT IS VERY IMPORTANT TO NOTE THAT THIS HAPPENS BEFORE
