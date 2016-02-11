@@ -832,13 +832,16 @@ class ListyParser(_ParsableBase):
         # Repeat until we get a terminate signal or we're at the EOF
         terminate = False
         endpoint = self.slice.stop or len(unpack_from)
-        while seeker < endpoint:
+        while seeker < endpoint and not terminate:
             seeker_advance, terminate = self._attempt_unpack_single(data, unpacked, seeker)
             seeker += seeker_advance
-            if terminate:
-                terminant = unpacked.pop()
-                break
+            
+        # If we hit the terminant, remove value from unpacked, else 
+        # check if we should have terminated. Not sure if awkward.
+        if terminate:
+            terminant = unpacked.pop()
         # This will be called if (and only if) EOF is encountered
+        # without seeing a terminate.
         else:
             self._verify_termination()
                 
