@@ -139,6 +139,8 @@ class Padding(ParserBase):
     ''' Class for a padding blob. Unpacks to its length.
     '''    
     def __init__(self, length, padding_byte=b'\x00'):
+        if len(padding_byte) != 1:
+            raise ValueError('padding_byte must have length of 1.')
         self._length = length
         self._padding = bytes(padding_byte * self.length)
         
@@ -158,6 +160,31 @@ class Padding(ParserBase):
         # No object validation or anything.
         # Return it as bytes.
         return self._padding
+    
+
+class Literal(ParserBase):
+    ''' Parses a constant value. Must pass bytes-like object to 
+    constructor.
+    '''    
+    def __init__(self, content):
+        self._length = len(content)
+        self._literal = bytes(content)
+        
+    @property
+    def length(self):
+        return self._length
+    
+    def unpack(self, data):
+        if data != self._literal:
+            raise ParseError('Passed data does not match specified literal.')
+            
+        # Always return the literal
+        return self._literal
+        
+    def pack(self, obj):
+        # No object validation or anything.
+        # Return it as bytes.
+        return self._literal
     
 
 class Null(ParserBase):

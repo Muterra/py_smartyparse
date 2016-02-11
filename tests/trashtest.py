@@ -307,9 +307,42 @@ if __name__ == '__main__':
     print('Success.')
     # assert tf_list.unpack(tv_list_pack) == tv_list
     
+    print('Testing nested explicit listyparser...')
+    tf_list_nest = SmartyParser()
+    tf_list_nest['_0'] = ParseHelper(parsers.Int8(signed=False))
+    tf_list_nest['_1'] = ParseHelper(parsers.Int16(signed=False))
+    tf_list_nest['_2'] = tf_list
+    tf_list_nest['_3'] = ParseHelper(parsers.Int8(signed=False))
+    tf_list_nest.link_length('_2', '_1')
+    
+    tv_list_nest = {
+        '_0': 12,
+        '_2': copy.deepcopy(tv_list),
+        '_3': 14,
+    }
+    
+    tv_list_nest_pack = tf_list_nest.pack(tv_list_nest)
+    tv_list_nest_recycle = tf_list_nest.unpack(tv_list_nest_pack)
+    print('No errors, but no test for equivalency yet.')
+    
+    print('Testing nested implicit listyparser.')
+    
+    terminant = ParseHelper(parsers.Literal(b'h'))
+    tf_exlist = ListyParser(parsers=[tag_typed], terminant=terminant)
+    
+    tf_exlist_nest = SmartyParser()
+    tf_exlist_nest['_0'] = ParseHelper(parsers.Int8(signed=False))
+    tf_exlist_nest['_2'] = tf_exlist
+    tf_exlist_nest['_3'] = ParseHelper(parsers.Int8(signed=False))
+        
+    tv_exlist_pack = tf_exlist_nest.pack(tv_list_nest)
+    tv_exlist_recycle = tf_exlist_nest.unpack(tv_exlist_pack)
+    print('No errors, but no test for equivalency yet.')
+    
     # Can do some kind of check for len of self.obj to determine if there's 
     # only a single entry in the smartyparser, and thereby expand any 
     # objects to pack or objects unpacked.
     
+    print('-----------------------------------------------')
     import IPython
     IPython.embed()

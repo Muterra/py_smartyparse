@@ -658,6 +658,12 @@ class ListyParser(_ParsableBase):
     Otherwise, terminant is a ParseHelper-like object. Will be tried 
     after each list unit while parsing, and appended while building. 
     Will immediately close list at first successful termination.
+    
+    Equals comparison will currently fail for reloads, since the lists
+    produced will not test for equivalency of each item. Must instead 
+    iterate over each object in both and test for equivalency there.
+    That's messy for nested lists; eventually support for this will be
+    added.
     '''
     def __init__(self, parsers, terminant=None, offset=0, callbacks=None):
         super().__init__(offset, callbacks)
@@ -781,6 +787,7 @@ class ListyParser(_ParsableBase):
         # and terminant=True/False if successful. Raise parseerror otherwise.
         # I should change this nomenclature to differentiate between 
         # parsables like ParseHelper and the actual parsers
+        terminant = False
         for parser in self._unpack_try_order:
             success = False
             parser.offset = seeker
@@ -788,7 +795,6 @@ class ListyParser(_ParsableBase):
             
             try:
                 obj = parser.unpack(unpack_from=unpack_from)
-                load_into.append(obj)
                 success = True
                 seeker_advance = parser.length or 0
                 break
@@ -802,18 +808,22 @@ class ListyParser(_ParsableBase):
         # in packed. If it wasn't, success=False, and packed is unchanged.
         if not success:
             raise ParseError('Could not find a valid parser for iterant.')
-            
-        # Return the offset.
-        # Also, what if parser was self.terminant? Note that if we've broken, 
+        
+        # In this case, handle loading the object. Note that if we've broken, 
         # parser still holds the last state.
-        return seeker_advance, parser is self.terminant
+        if parser is self.terminant:
+            terminant = True
+        else:
+            load_into.append(obj)
+            
+        # Return the offset and if it was the terminant.
+        return seeker_advance, terminant
         
     def unpack(self, unpack_from):
+        # print(self.length)
         # Create output object and reframe as memoryview to avoid copies
         unpacked = []
         data = memoryview(unpack_from)
-        # Force a length reset (gross but functional)
-        self.length = None
         self._infer_length()
         self._build_slice()
         # Error trap if no known length but preunpack callback:
@@ -829,7 +839,7 @@ class ListyParser(_ParsableBase):
         
         # Repeat until we get a terminate signal or we're at the EOF
         terminate = False
-        while not terminate and seeker < len(unpack_from):
+        while not terminate and (seeker < (self.slice.stop or len(unpack_from))):
             seeker_advance, terminate = self._attempt_unpack_single(data, unpacked, seeker)
             seeker += seeker_advance
                 
