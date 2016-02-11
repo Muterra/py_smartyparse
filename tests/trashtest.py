@@ -262,5 +262,41 @@ if __name__ == '__main__':
     parent.pack(off)
     parent.pack(on)
     
+    # -----------------------------------------------------------------
+    from smartyparse import ListyParser
+    from smartyparse import ParseHelper
+    from smartyparse.parsers import Int8
+    
+    pastr = SmartyParser()    
+    pastr['length'] = ParseHelper(parsers.Int8(signed=False))
+    pastr['body'] = ParseHelper(parsers.String())
+    pastr.link_length('body', 'length')
+    
+    tag_typed = SmartyParser()
+    tag_typed['tag'] = ParseHelper(parsers.Int8(signed=False))
+    tag_typed['toggle'] = None
+    
+    @references(tag_typed)
+    def switch(self, tag):
+        if tag == 0:
+            self['toggle'] = ParseHelper(parsers.Int8(signed=False))
+        elif tag == 1:
+            self['toggle'] = ParseHelper(parsers.Int16(signed=False))
+        elif tag == 2:
+            self['toggle'] = ParseHelper(parsers.Int32(signed=False))
+        elif tag == 3:
+            self['toggle'] = ParseHelper(parsers.Int64(signed=False))
+        else:
+            self['toggle'] = pastr
+    tag_typed['tag'].register_callback('prepack', switch)
+    tag_typed['tag'].register_callback('postunpack', switch)
+    
+    aaa = ListyParser(parsers=[tag_typed])
+    bbb = aaa.pack([{'tag': 0, 'toggle': 5}, {'tag': 1, 'toggle': 51}, {'tag': 65, 'toggle': {'body': 'hello world'}}, {'tag': 2, 'toggle': 3453}])
+    
+    # Can do some kind of check for len of self.obj to determine if there's 
+    # only a single entry in the smartyparser, and thereby expand any 
+    # objects to pack or objects unpacked.
+    
     import IPython
     IPython.embed()

@@ -83,13 +83,13 @@ class _StructParserBase(ParserBase):
     def unpack(self, data):
         try:
             return self._packer.unpack(data)[0]
-        except (TypeError, ValueError) as e:
+        except struct.error as e:
             raise ParseError('Failed to parse value.') from e
         
     def pack(self, obj):
         try:
             return self._packer.pack(obj)
-        except (TypeError, ValueError) as e:
+        except struct.error as e:
             raise ParseError('Failed to parse value.') from e
         
 

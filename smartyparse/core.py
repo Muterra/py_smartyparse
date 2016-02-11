@@ -72,6 +72,10 @@ class _SmartyparseCallback():
             
         return result
         
+    def __bool__(self):
+        # Return false if func is NOOP and modify false
+        return not (self._func == self.NOOP and not self.modify)
+        
     @property
     def func(self):
         return self._func
@@ -124,6 +128,9 @@ class _SPOMeta(type):
     Defines the class __repr__ and __str__ to expose the available
     fieldnames there.
     '''
+    def __len__(self):
+        return len(self.__slots__)
+    
     def __repr__(self):
         c = "<class 'SmartyParseObject'>: _smartyobject("
         c += str(self.__slots__)
@@ -664,10 +671,11 @@ class ListyParser(_ParsableBase):
         
     @terminant.setter
     def terminant(self, value):
-        if value != None:
-            self._terminant = value
-        else:
-            self._terminant = ParseHelper(parsers.Null())
+        self._terminant = value
+        # if value != None:
+        #     self._terminant = value
+        # else:
+        #     self._terminant = ParseHelper(parsers.Null())
             
     @terminant.deleter
     def terminant(self):
@@ -675,7 +683,10 @@ class ListyParser(_ParsableBase):
         
     @property
     def _unpack_try_order(self):
-        return [self.terminant].extend(self.parsers)
+        if self.terminant:
+            return [self.terminant] + self.parsers
+        else:
+            return self.parsers
         
     @property
     def parser(self):
@@ -739,9 +750,10 @@ class ListyParser(_ParsableBase):
             seeker += seeker_advance
         
         # Now call the terminant on the packed data
-        self.terminant.offset = seeker
-        self.terminant.pack(obj=packed, pack_into=packed)
-        self.terminant.offset = 0
+        if self.terminant:
+            self.terminant.offset = seeker
+            self.terminant.pack(obj=packed, pack_into=packed)
+            self.terminant.offset = 0
         
         # Finally, call the post-pack callback and return.
         packed = self._callback_postpack(packed)
@@ -761,20 +773,73 @@ class ListyParser(_ParsableBase):
         return pack_into
         
     def unpack(self, unpack_from):
-        pass
+        # Create output object and reframe as memoryview to avoid copies
+        unpacked = []
+        data = memoryview(unpack_from)
+        # Force a length reset (gross but functional)
+        self.length = None
+        self._infer_length()
+        self._build_slice()
+        # Error trap if no known length but preunpack callback:
+        if self.length == None and self.callback_preunpack:
+            raise ParseError('Cannot call pre-unpack callback with '
+                                'indeterminate length. Your format may '
+                                'be impossible to explicitly unpack.')
+        # We can always unambiguously call this now, thanks to above.
+        self._callback_preunpack(data[self.slice])
         
-        # And now convert obj to a deque for performance
-        obj = collections.deque(obj)
+        # Use this to control the "cursor" position
+        seeker = self.offset
         
-        # Control
-        swimming = True
-        while swimming:
-            this_data = None
+        # Repeat until break
+        while True:
+            # this_data = None
             
             # I should change this nomenclature to differentiate between 
             # parsables like ParseHelper and the actual parsers
             for parser in self._unpack_try_order:
+                success = False
                 parser.offset = seeker
+                parser._infer_length()
+                
+                try:
+                    obj = parser.unpack(unpack_from=data)
+                    unpacked.append(obj)
+                    success = True
+                    seeker_advance = parser.length or 0
+                    break
+                except ParseError:
+                    pass
+                finally:
+                    # This is, in fact, also executed when departing via break
+                    parser.offset = 0
+                
+            # If it was successfully parsed, success=True, and the object is
+            # in packed. If it wasn't, success=False, and packed is unchanged.
+            if not success:
+                raise ParseError('Could not find a valid parser for iterant.')
+                
+            seeker += seeker_advance
+                
+            # What if parser was self.terminant? Note that if we've broken, 
+            # parser still holds the last state.
+            # Also, what if we're at the end of our rope?
+            if parser is self.terminant or seeker >= len(unpack_from):
+                break
+                
+            # # Infer lengths and then check them
+            # self.length = seeker - self.offset
+            # self._infer_length()
+            # print('seeker   ', seeker)
+            # print('newlen   ', parser.length)
+            # print('slice    ', parser.slice)
+            # print('data     ', bytes(data[parser.slice]))
+            # print('-----------------------------------------------')
+                
+        # Finally, we need to callback and return, freezing to a tuple for 
+        # performance reasons
+        unpacked = tuple(self._callback_postunpack(unpacked))
+        return unpacked
 
 
 class SmartyParser(_ParsableBase):
@@ -829,7 +894,7 @@ class SmartyParser(_ParsableBase):
                 for parser in self._control.values():
                     static_length += parser.length
                 result = static_length
-            except TypeError:    
+            except (TypeError, AttributeError):    
                 pass
         self.length = result
         
@@ -1177,7 +1242,7 @@ class SmartyParser(_ParsableBase):
         self._infer_length()
         self._build_slice()
         # Error trap if no known length but preunpack callback:
-        if self.length == None and self.callback_preunpack[0] != None:
+        if self.length == None and self.callback_preunpack:
             raise ParseError('Cannot call pre-unpack callback with '
                                 'indeterminate length. Your format may '
                                 'be impossible to explicitly unpack.')
