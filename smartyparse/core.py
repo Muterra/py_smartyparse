@@ -647,6 +647,10 @@ class ListyParser(_ParsableBase):
     parsers are a list of parsers. It will try them, in that order,
     until one works.
     
+    require_term defines behavior when encountering EOF before a the
+    defined terminant. True will error out if this condition occurs;
+    False will ignore and continue parsing.
+    
     Terminant will be prepended to the list. If it happens first, list
     will terminate.
     
@@ -665,8 +669,9 @@ class ListyParser(_ParsableBase):
     That's messy for nested lists; eventually support for this will be
     added.
     '''
-    def __init__(self, parsers, terminant=None, offset=0, callbacks=None):
+    def __init__(self, parsers, terminant=None, require_term=True, offset=0, callbacks=None):
         super().__init__(offset, callbacks)
+        self.require_term = require_term
         self.terminant = terminant
         self.parsers = parsers
         self.length = None
@@ -784,13 +789,13 @@ class ListyParser(_ParsableBase):
         # and terminant=True/False if successful. Raise parseerror otherwise.
         # I should change this nomenclature to differentiate between 
         # parsables like ParseHelper and the actual parsers
-        terminant = False
         for parser in self._unpack_try_order:
             parser.offset = seeker
             parser._infer_length()
             
             try:
                 obj = parser.unpack(unpack_from=unpack_from)
+                load_into.append(obj)
                 seeker_advance = parser.length or 0
                 break
             except ParseError:
@@ -802,16 +807,9 @@ class ListyParser(_ParsableBase):
         # successful parser discovery.
         else:
             raise ParseError('Could not find a valid parser for iterant.')
-        
-        # In this case, handle loading the object. Note that if we've broken, 
-        # parser still holds the last state.
-        if parser is self.terminant:
-            terminant = True
-        else:
-            load_into.append(obj)
             
         # Return the offset and if it was the terminant.
-        return seeker_advance, terminant
+        return seeker_advance, parser is self.terminant
         
     def unpack(self, unpack_from):
         # print(self.length)
@@ -834,14 +832,26 @@ class ListyParser(_ParsableBase):
         # Repeat until we get a terminate signal or we're at the EOF
         terminate = False
         endpoint = self.slice.stop or len(unpack_from)
-        while not terminate and seeker < endpoint:
+        while seeker < endpoint:
             seeker_advance, terminate = self._attempt_unpack_single(data, unpacked, seeker)
             seeker += seeker_advance
+            if terminate:
+                terminant = unpacked.pop()
+                break
+        # This will be called if (and only if) EOF is encountered
+        else:
+            self._verify_termination()
                 
         # Finally, we need to callback and return, freezing to a tuple for 
         # performance reasons
         unpacked = tuple(self._callback_postunpack(unpacked))
         return unpacked
+        
+    def _verify_termination(self):
+        if self.terminant and self.require_term:
+            raise ParseError('EOF encountered without required list termination.')
+        else:
+            return True
 
 
 class SmartyParser(_ParsableBase):
