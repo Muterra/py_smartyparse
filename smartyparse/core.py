@@ -1240,13 +1240,11 @@ class SmartyParser(_ParsableBase):
         # Construct the output and reframe as memoryview for performance
         unpacked = self.obj()
         data = memoryview(unpack_from)
-        # Force a length reset. Gross, but works. If static, will be 
-        # recalculated with _infer_length.
-        self.length = None
-        # Some other init stuff
-        self._infer_length()
-        self._build_slice()
+        
         # Error trap if no known length but preunpack callback:
+        # This is probably not working for dynamic formats, because if
+        # length is defined one run, state won't be cleared before the
+        # next run.
         if self.length == None and self.callback_preunpack:
             raise ParseError('Cannot call pre-unpack callback with '
                                 'indeterminate length. Your format may '
@@ -1278,17 +1276,20 @@ class SmartyParser(_ParsableBase):
             # length of any lengthlinked data field after loading,
             # we can now move it after. Also, this was causing bugs.
                 
+            # print('name     ', fieldname)
+            # print('seeker   ', seeker)
+            # print('slice    ', parser.slice)
+            # print('data     ', bytes(data[seeker:]))
+                
             # Aight we're good to go, but only return stuff that matters
             obj = parser.unpack(data)
             if fieldname not in self._exclude_from_obj:
                 unpacked[fieldname] = obj
                 
-            # print('seeker   ', seeker)
-            # print('newlen   ', parser.length)
-            # print('slice    ', parser.slice)
-            # print('data     ', bytes(data[parser.slice]))
+            # print('object   ', obj)
+            # print('length   ', self.length)
             # print('-----------------------------------------------')
-                
+            
             # Check length to add
             seeker_advance = parser.length
             
@@ -1300,9 +1301,11 @@ class SmartyParser(_ParsableBase):
             # Finally, reset the parser offset.
             parser.offset = 0
                 
-            # Infer lengths and then check them
-            self.length = seeker - self.offset
-            self._infer_length()
+        # Infer lengths
+        self.length = seeker - self.offset
+        # Some kind of length checking should probably be added back in,
+        # but this breaks all sorts of shit.
+        # self._infer_length()
             
         # Post-unpack calls on obj
         # Modification vs non-modification is handled by the SmartyparseCallback

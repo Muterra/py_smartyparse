@@ -175,7 +175,7 @@ class Literal(ParserBase):
         return self._length
     
     def unpack(self, data):
-        if data != self._literal:
+        if data is not None and data != self._literal:
             raise ParseError('Passed data does not match specified literal.')
             
         # Always return the literal
