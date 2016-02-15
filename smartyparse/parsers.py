@@ -165,24 +165,45 @@ class Padding(ParserBase):
 class Literal(ParserBase):
     ''' Parses a constant value. Must pass bytes-like object to 
     constructor.
+    
+    If verify=True, will enforce full symmetricity: objects to pass MUST
+    be equivalent to the literal, and unpacked objects will ALWAYS
+    return the literal.
+    
+    If verify=False, will enforce trust (or lack thereof). Objects to
+    pass will be ignored, and unpacked objects will ALWAYS return None.
     '''    
-    def __init__(self, content):
+    def __init__(self, content, verify=True):
         self._length = len(content)
         self._literal = bytes(content)
+        self._verify = verify
+        
+    @property
+    def value(self):
+        return self._literal
         
     @property
     def length(self):
         return self._length
     
     def unpack(self, data):
-        if data is not None and data != self._literal:
-            raise ParseError('Passed data does not match specified literal.')
+        # If verify=True, enforce matching and return the literal.
+        if self._verify:
+            if data != self.value:
+                raise ParseError('Passed data does not match specified literal.')
+            else:
+                unpacked = self.value
+        # If verify=False, ignore value and return None.
+        else:
+            unpacked = None
             
-        # Always return the literal
-        return self._literal
+        return unpacked
         
     def pack(self, obj):
-        # No object validation or anything.
+        # Enforce symmetricity if verify=True
+        if self._verify and obj != self.value:
+            raise ParseError('Passed object does not match specified literal.')
+                
         # Return it as bytes.
         return self._literal
     
