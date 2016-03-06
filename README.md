@@ -35,7 +35,7 @@ Smartyparse has no external dependencies at this time (beyond the standard libra
     
 # Example usage
 
-See [/doc](https://github.com/Muterra/py_smartyparse/tree/master/doc) for full API documentation.
+See [/docs](https://github.com/Muterra/py_smartyparse/tree/master/docs) for full API documentation.
 
 **Declaring a simple length -> data object:**
 
@@ -102,12 +102,15 @@ True
 
 # Supporting SmartyParse
 
-Smartyparse is under development as part of the [Muse protocol](https://github.com/Muterra/doc-muse) implementation used in the [Ethyr](https://www.ethyr.net) encrypted email-like messaging application. **If you would like to support Smartyparse, Muse, or Ethyr, please consider contributing to our [IndieGoGo campaign](https://www.indiegogo.com/projects/ethyr-modern-encrypted-email).**
+Smartyparse is under development as part of the [Muse protocol](https://github.com/Muterra/doc-muse) implementation used in the [Ethyr](https://www.ethyr.net) encrypted email-like messaging application.
 
 # Todo
 
 (In no particular order)
 
++ Ensure that smartyparsers can be created without parsers, so that callbacks can be registered on them, before their parsers have been defined. Basically, avoid all of these incredibly annoying "Nonetype has no set_callback method" issues by allowing on-the-fly parser declaration, instead of setting the actual field itself to None.
++ Think about register_callback vs set_callback vs add_callback etc. It would be nice to easily and natively support multiple callbacks. HOWEVER, there's an argument to be made that this should be handled elsewhere, since functions can call other functions.
++ Allow SmartyParsers with a single "visible" object (example: pascal strings) to be expanded into parent containers, avoiding the awkward double-dict construction
 + Change SmartyParserObject to use slots for storage, but not for item names (essentially removing attribute-style access, which isn't documented anyways)
 + Add self-describing format to example usage
 + Write .bmp library showcase
@@ -125,12 +128,14 @@ Smartyparse is under development as part of the [Muse protocol](https://github.c
 + Random self-describing format declaration and testing
 + Performance testing
 + Add customized [pep8](http://pep8.readthedocs.org/en/latest/) to [codeclimate testing](https://docs.codeclimate.com/v1.0/docs/pep8), as per (as yet unpublished) Muterra code style guide
-+ Support for "end flags" for indeterminate-length lists
++ Change logic to allow for delayed execution on callbacks for link_length so the content parser can be dynamically specified
++ Add utility function for generating a single callback from multiple callables
 
 ### Done!
 
 + ~~Add passing of parent SmartyParser to callback system.~~ Added in 0.1a4 with the ```@references(referent)``` decorator.
 + ~~Clean up callback API.~~ Added in 0.1a4
++ ~~Support for "end flags" for indeterminate-length lists~~ Added in 0.1a5
 
 # Misc API notes
 

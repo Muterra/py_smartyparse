@@ -52,8 +52,3 @@ docs/_build/
 
 # PyBuilder
 target/
-simpleubjson/
-*.eicd
-*.eics
-*.eica
-*.pem

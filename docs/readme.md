@@ -9,6 +9,10 @@ one convenience decorator for callback creation:
 
 + ```@references()```
 
+one exception:
+
++ ```ParseError```
+
 as well as several parsing primitives:
 
 + Binary blobs (```parsers.Blob```)
@@ -318,17 +322,20 @@ def decide(self, switch):
         
 parent['switch'].register_callback('prepack', decide)
 parent['switch'].register_callback('postunpack', decide)
-        
-off = {'switch': 1, 'light': -55}
-on = {'switch': 0, 'light': b'Hello world'}
 ```
 
 ```python
+>>> off = {'switch': 1, 'light': -55}
+>>> on = {'switch': 0, 'light': b'Hello world'}
 >>> parent.pack(off)
 bytearray(b'\x01\xc9')
 >>> parent.pack(on)
 bytearray(b'\x00Hello world')
 ```
+
+# ```ParseError```
+
+```ParseError``` is an exception generated when problems are encountered during parsing. It is a direct subclass of ```RuntimeError```.
 
 # Parsers
 

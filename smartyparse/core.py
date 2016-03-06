@@ -31,7 +31,7 @@ Smartyparse: A python library for smart dynamic binary de/encoding.
 
 '''
 
-__all__ = ['ParseHelper', 'SmartyParser', 'ListyParser', 'references']
+__all__ = ['ParseHelper', 'SmartyParser', 'ListyParser', 'references', 'ParseError']
 
 # Global dependencies
 import abc
@@ -538,8 +538,12 @@ class ParseHelper(_ParsableBase):
     THIS SHOULD REALLY BE REFACTORED TO USE A CONTEXT MANAGER for state
     management of offset, slice, etc. THAT would definitely be smart.
     '''
-    def __init__(self, parser, offset=0, length=None, callbacks=None):
+    def __init__(self, parser=None, offset=0, length=None, callbacks=None):
         super().__init__(offset, callbacks)
+        
+        if parser is None:
+            parser = parsers.Null
+        
         self.parser = parser
         self.length = length
         
