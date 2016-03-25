@@ -53,8 +53,8 @@ from smartyparse.parsers import Null
 # ###############################################
 # Testing
 # ###############################################
-                
-if __name__ == '__main__':
+    
+def run():
     # Generic format
     tf_1 = SmartyParser()
     tf_1['magic'] = ParseHelper(Blob(length=4))
@@ -327,7 +327,7 @@ if __name__ == '__main__':
     
     print('Testing nested implicit listyparser.')
     
-    terminant = ParseHelper(parsers.Literal(b'h'))
+    terminant = ParseHelper(parsers.Literal(b'h', verify=False))
     tf_exlist = ListyParser(parsers=[tag_typed], terminant=terminant)
     
     tf_exlist_nest = SmartyParser()
@@ -344,5 +344,8 @@ if __name__ == '__main__':
     # objects to pack or objects unpacked.
     
     print('-----------------------------------------------')
-    import IPython
-    IPython.embed()
+    # import IPython
+    # IPython.embed()
+                
+if __name__ == '__main__':
+    run()
