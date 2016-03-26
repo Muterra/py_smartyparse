@@ -1245,6 +1245,10 @@ class SmartyParser(_ParsableBase):
         unpacked = self.obj()
         data = memoryview(unpack_from)
         
+        # Don't forget to define our slice before callbacks fuck up shit
+        self.length = len(unpack_from)
+        self._build_slice()
+        
         # Error trap if no known length but preunpack callback:
         # This is probably not working for dynamic formats, because if
         # length is defined one run, state won't be cleared before the
