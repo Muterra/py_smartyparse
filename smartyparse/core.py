@@ -820,8 +820,15 @@ class ListyParser(_ParsableBase):
         # Create output object and reframe as memoryview to avoid copies
         unpacked = []
         data = memoryview(unpack_from)
+            
         self._infer_length()
+        
+        # This is extremely likely to introduce hard-to-find bugs when reusing
+        # ListyParsers, but it's a quick fix.
+        if self.length is None:
+            self._length = len(data)
         self._build_slice()
+        
         # Error trap if no known length but preunpack callback:
         if self.length == None and self.callback_preunpack:
             raise ParseError('Cannot call pre-unpack callback with '
