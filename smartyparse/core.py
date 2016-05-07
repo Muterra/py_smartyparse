@@ -989,7 +989,7 @@ class SmartyParser(_ParsableBase):
         So, put in order,
             1. packing starts with unpacked metadata and packed data.
                From that, it generates packed metadata.
-                    + With ex. a MUID, that means you'd start with a 
+                    + With ex. a GHID, that means you'd start with a 
                       precomputed hash dumped to bytes, as well as a 
                       value indicating which hash suite to use, and 
                       those two are passed to the function to create the 
@@ -1001,7 +1001,7 @@ class SmartyParser(_ParsableBase):
                       and it returns the calculated length back. Presto.
             2. unpacking startes with unpacked metadata and packed data.
                From that, it MUTATES THE PACKED DATA.
-                    + With ex. a MUID, that results in running a lookup,
+                    + With ex. a GHID, that results in running a lookup,
                       and slicing the data to the appropriate length. 
                       That slice is then passed to the unpacker, instead
                       of the whole file.
