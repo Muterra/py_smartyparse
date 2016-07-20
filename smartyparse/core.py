@@ -43,6 +43,133 @@ import functools
 from . import parsers
 from .parsers import ParseError
 
+
+# ###############################################
+# Rewrite planning
+# ###############################################
+
+
+class __SmartyParserNew:
+    def __init__(self, repeating=False):
+        ''' Repeating replaces ListyParser. It will cause the SP.unpack
+        call to repeat until the entire input bytes object is consumed.
+        
+        Regardless of the repeating behavior, if the bytes object is not
+        perfectly consumed (not too long nor too short), parsing will 
+        raise. To avoid that behavior, you must explicitly add a padding
+        parser with a length callback to consume whatever is left.
+        
+        Maybe add something to allow for collapsing the field, if it's a
+        nested smartyparser?
+        '''
+        self._finalized = None
+        self._fields = collections.OrderedDict()
+        self._parsers = []
+        self._parser_calls = []
+        self._lengths = []
+        self._length_calls = []
+        
+    @property
+    def definition(self):
+        ''' Returns the current definition of the SmartyParser.
+        '''
+        pass
+        
+    def _ensure_mutable(self):
+        if self._finalized is not None:
+            raise RuntimeError('Cannot mutate a finalized SmartyParser.')
+    
+    def add_field(self, fieldname=None, parser=None, length=None):
+        ''' Registers a parsing field. If fieldname is None, assigns the
+        index as the fieldname.
+        
+        Maybe add something to allow for collapsing the field, if it's a
+        nested smartyparser?
+        '''
+        self._ensure_mutable()
+        
+        if fieldname is None:
+            fieldname = len(self._fields)
+            
+        self._fields[fieldname] = index
+        # We need to make sure everything is the right length.
+        self._parsers.append(None)
+        self._parser_calls.append(None)
+        self._lengths.append(None)
+        self._length_calls.append(None)
+        
+        self.set_parser(fieldname, parser)
+        # Could add something checking parselength to auto-detect length.
+        self.set_length(fieldname, length)
+        
+    def set_length(self, fieldname, length):
+        ''' Sets the length for a fieldname. Can only be called before
+        parsing. May be a callback, in which case it will be passed the
+        usual callback signature.
+        '''
+        self._ensure_mutable()
+        
+        index = self.fields[fieldname]
+        
+        # Primitive type checking
+        if callable(length):
+            self._length_calls[index] = length
+            
+        else:
+            try:
+                self._lengths[index] = int(length)
+            except TypeError as exc:
+                raise TypeError('Must be callable or int-able.') from exc
+        
+    def set_parser(self, fieldname, parser):
+        ''' Sets the parser for a fieldname. Can only be called before
+        parsing. May be a callback, in which case it will be passed the
+        usual callback signature.
+        '''
+        self._ensure_mutable()
+        
+        index = self.fields[fieldname]
+        
+        # Primitive type checking
+        if callable(parser):
+            self._parse_calls[index] = parser
+            
+        else:
+            # Hm, maybe add some kind of check for parsability?
+            self._parsers[index] = parser
+    
+    def finalize(self):
+        # Do some checking to make sure the resulting definition is, in fact,
+        # fully parsable.
+        # Note that this may also require checking any nested SmartyParsers
+        # for finalized()?
+        if self._finalized is not None:
+            raise RuntimeError('Cannot finalize multiple times.')
+        
+        class SPInstance:
+            def __init__(self):
+                slices = slice(0, 1)
+                # etc
+                
+        self._finalized = SPInstance
+        
+    async def pack(self, obj):
+        '''
+        '''
+        if self._finalized is None:
+            raise RuntimeError('Must finalize before packing or unpacking.')
+            
+        return (await self._finalized().pack(obj))
+        
+    async def unpack(self, packed):
+        '''
+        '''
+        if self._finalized is None:
+            raise RuntimeError('Must finalize before packing or unpacking.')
+            
+        return (await self._finalized().unpack(packed))
+
+
 # ###############################################
 # Helper objects
 # ###############################################
