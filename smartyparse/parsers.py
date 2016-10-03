@@ -105,7 +105,7 @@ class Blob(ParserBase):
                     raise TypeError('Length must be int-like.')
                 if length < 0:
                     raise ValueError('Length must be positive.')
-            except:
+            except Exception:
                 raise TypeError('Length must be int-like.')
         self._length = length
         
