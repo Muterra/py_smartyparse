@@ -5,6 +5,10 @@ want this whole thing to work.
     
 Question: how to handle repeated/streaming parsers, like ghidlists?
 Should that use, for example, a field.repeat = True or something?
+
+Note: tracking order of field definition is included as an example in
+the metaclass docs:
+https://docs.python.org/3.6/reference/datamodel.html#metaclass-example
 '''
 
 from smartyparse import Field
