@@ -7,7 +7,7 @@ Smartyparse: A python library for smart dynamic binary de/encoding.
     
     Contributors
     ------------
-    Nick Badger 
+    Nick Badger
         badg@muterra.io | badg@nickbadger.com | nickbadger.com
 
     This library is free software; you can redistribute it and/or
@@ -21,10 +21,10 @@ Smartyparse: A python library for smart dynamic binary de/encoding.
     Lesser General Public License for more details.
 
     You should have received a copy of the GNU Lesser General Public
-    License along with this library; if not, write to the 
+    License along with this library; if not, write to the
     Free Software Foundation, Inc.,
-    51 Franklin Street, 
-    Fifth Floor, 
+    51 Franklin Street,
+    Fifth Floor,
     Boston, MA  02110-1301 USA
 
 ------------------------------------------------------
@@ -32,9 +32,23 @@ Smartyparse: A python library for smart dynamic binary de/encoding.
 '''
 
 # Global dependencies
+import logging
 import struct
 import abc
 import collections
+
+
+# ###############################################
+# Boilerplate
+# ###############################################
+
+
+__all__ = [
+]
+
+
+logger = logging.getLogger(__name__)
+
 
 # ###############################################
 # Parsers
@@ -163,7 +177,7 @@ class Padding(ParserBase):
     
 
 class Literal(ParserBase):
-    ''' Parses a constant value. Must pass bytes-like object to 
+    ''' Parses a constant value. Must pass bytes-like object to
     constructor.
     
     If verify=True, will enforce full symmetricity: objects to pass MUST
@@ -172,7 +186,8 @@ class Literal(ParserBase):
     
     If verify=False, will enforce trust (or lack thereof). Objects to
     pass will be ignored, and unpacked objects will ALWAYS return None.
-    '''    
+    '''
+    
     def __init__(self, content, verify=True):
         self._length = len(content)
         self._literal = bytes(content)
@@ -190,7 +205,10 @@ class Literal(ParserBase):
         # If verify=True, enforce matching and return the literal.
         if self._verify:
             if data != self.value:
-                raise ParseError('Passed data does not match specified literal.')
+                raise ParseError(
+                    'Mismatched literal: received ' + str(bytes(data)) +
+                    ', expected ' + str(self.value)
+                )
             else:
                 unpacked = self.value
         # If verify=False, ignore value and return None.
