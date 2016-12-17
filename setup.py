@@ -14,21 +14,25 @@ from os import path
 
 here = path.abspath(path.dirname(__file__))
 
-long_description = '''Smartyparse is an intelligent general-purpose binary parsing, marshalling, 
-serializing, etc library. Capable of dynamic operations, self-describing 
-formats, nested formats, etc. Use it to encode, decode, and develop binary 
-formats quickly and easily. It supports ```python>=3.3```.'''
-# If we're installing, don't bother building the long_description
-# Ewwww, this is dirty.
-if sys.argv[1] == 'sdist':
-    with open('README.md', 'r') as f:
-        s_readme = f.read()
+long_description = (
+    'Smartyparse is an intelligent general-purpose binary parsing, ' +
+    'marshalling, serializing, etc library. Capable of dynamic operations, ' +
+    'self-describing formats, nested formats, etc. Use it to encode, ' +
+    'decode, and develop binary formats quickly and easily. It supports ' +
+    '```python>=3.3```.'
+)
+
+# # If we're installing, don't bother building the long_description
+# # Ewwww, this is dirty.
+# if sys.argv[1] == 'sdist':
+#     with open('README.md', 'r') as f:
+#         s_readme = f.read()
         
-    # Get the long description from the README file
-    import pypandoc
-    long_description = pypandoc.convert(s_readme, 'rst', format='md')
-    with open('README.rst', 'w') as f:
-        f.write(long_description)
+#     # Get the long description from the README file
+#     import pypandoc
+#     long_description = pypandoc.convert(s_readme, 'rst', format='md')
+#     with open('README.rst', 'w') as f:
+#         f.write(long_description)
 
 setup(
     name='smartyparse',
@@ -36,7 +40,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.1.0',
+    version='0.1.1',
 
     description='A python library for smart dynamic binary de/encoding.',
     long_description=long_description,
